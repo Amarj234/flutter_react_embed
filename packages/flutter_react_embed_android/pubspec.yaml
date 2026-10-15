@@ -1,19 +1,20 @@
 name: flutter_react_embed_android
-description: Android implementation of flutter_react_embed (WebView engine).
-version: 0.1.0
-publish_to: none
+description: Android implementation of flutter_react_embed. Hosts React web apps in a WebView served from app assets, as a Flutter platform view.
+version: 1.0.0
+repository: https://github.com/Amarj234/flutter_react_embed/tree/main/packages/flutter_react_embed_android
+issue_tracker: https://github.com/Amarj234/flutter_react_embed/issues
 resolution: workspace
 
 environment:
-  sdk: ^3.6.0
-  flutter: ">=3.27.0"
+  sdk: ^3.13.0
+  flutter: ">=3.47.0"
 
 dependencies:
   flutter:
     sdk: flutter
 
 dev_dependencies:
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
 
 flutter:
   plugin:

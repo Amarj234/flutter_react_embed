@@ -42,9 +42,9 @@ void main() {
     previousOnError = FlutterError.onError;
     FlutterError.onError = reportedErrors.add;
     controlReply = (MethodCall call) => switch (call.method) {
-          'initializeEngine' => <String, Object?>{'runtimeId': 'rt-1'},
-          _ => null,
-        };
+      'initializeEngine' => <String, Object?>{'runtimeId': 'rt-1'},
+      _ => null,
+    };
 
     messenger()
       ..setMockMethodCallHandler(platform.controlChannel, (MethodCall call) async {
@@ -75,8 +75,13 @@ void main() {
     controlReply = (MethodCall _) => throw PlatformException(code: 'BUNDLE_NOT_FOUND', message: 'missing');
     await expectLater(
       platform.initializeEngine(_config),
-      throwsA(isA<ReactEngineInitializationException>()
-          .having((ReactEngineInitializationException e) => e.code, 'code', 'BUNDLE_NOT_FOUND')),
+      throwsA(
+        isA<ReactEngineInitializationException>().having(
+          (ReactEngineInitializationException e) => e.code,
+          'code',
+          'BUNDLE_NOT_FOUND',
+        ),
+      ),
     );
 
     controlReply = (MethodCall _) => <String, Object?>{'unexpected': true};
@@ -108,7 +113,7 @@ void main() {
       'frame': jsonEncode(<String, Object?>{
         'jsonrpc': '2.0',
         'id': request['id'],
-        'result': <String, Object?>{'items': 2}
+        'result': <String, Object?>{'items': 2},
       }),
     });
     expect(await result, <String, Object?>{'items': 2});
@@ -174,8 +179,10 @@ void main() {
 
   test('disposeEngine is idempotent and fails pending work', () async {
     final ReactRuntimeHandle rt = await platform.initializeEngine(_config);
-    final Future<void> pending =
-        expectLater(platform.invoke(rt, 'slow'), throwsA(isA<ReactRuntimeDisposedException>()));
+    final Future<void> pending = expectLater(
+      platform.invoke(rt, 'slow'),
+      throwsA(isA<ReactRuntimeDisposedException>()),
+    );
     await pumpEventQueue();
 
     await platform.disposeEngine(rt);

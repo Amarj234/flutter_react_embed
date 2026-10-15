@@ -132,8 +132,9 @@ class _EmbedLabPageState extends State<EmbedLabPage> {
   final JsLog _log = JsLog();
   final List<StreamSubscription<Object?>> _subscriptions = <StreamSubscription<Object?>>[];
 
-  EmbeddedSurface _surface =
-      reactAppManifest.available ? EmbeddedSurface.reactDashboard : EmbeddedSurface.internalState;
+  EmbeddedSurface _surface = reactAppManifest.available
+      ? EmbeddedSurface.reactDashboard
+      : EmbeddedSurface.internalState;
   ReactViewController? _controller;
 
   // State owned by Flutter and rendered by the internal state view.
@@ -147,7 +148,7 @@ class _EmbedLabPageState extends State<EmbedLabPage> {
       LogSource.host,
       reactAppManifest.available
           ? 'React bundle ${reactAppManifest.ref} (${_short(reactAppManifest.commit)}), '
-              '${reactAppManifest.fileCount} files'
+                '${reactAppManifest.fileCount} files'
           : 'No React bundle installed; run example/tool/setup_test_react.sh',
     );
   }
@@ -166,20 +167,21 @@ class _EmbedLabPageState extends State<EmbedLabPage> {
   void _attachController(ReactViewController controller) {
     _detachController();
     final FlutterReactEmbedPlatform platform = FlutterReactEmbedPlatform.instance;
-    _log.add(
-      LogSource.host,
-      'surface attached: view ${controller.viewId}, runtime ${_short(controller.runtime.id)}',
-    );
+    _log.add(LogSource.host, 'surface attached: view ${controller.viewId}, runtime ${_short(controller.runtime.id)}');
     try {
       _subscriptions
         ..add(controller.events().listen(_onEvent))
-        ..add(platform.runtimeErrors(controller.runtime).listen((ReactRuntimeError e) {
-          final String stack = e.jsStack == null ? '' : '\n${e.jsStack!.split('\n').first}';
-          _log.add(LogSource.error, '${e.isFatal ? 'FATAL ' : ''}${e.message}$stack');
-        }))
-        ..add(platform.runtimeStates(controller.runtime).listen((ReactRuntimeState s) {
-          _log.add(LogSource.state, 'runtime ${s.name}');
-        }));
+        ..add(
+          platform.runtimeErrors(controller.runtime).listen((ReactRuntimeError e) {
+            final String stack = e.jsStack == null ? '' : '\n${e.jsStack!.split('\n').first}';
+            _log.add(LogSource.error, '${e.isFatal ? 'FATAL ' : ''}${e.message}$stack');
+          }),
+        )
+        ..add(
+          platform.runtimeStates(controller.runtime).listen((ReactRuntimeState s) {
+            _log.add(LogSource.state, 'runtime ${s.name}');
+          }),
+        );
     } on ReactEmbedException catch (e) {
       _log.add(LogSource.error, 'could not subscribe: ${e.message}');
     }
@@ -252,11 +254,7 @@ class _EmbedLabPageState extends State<EmbedLabPage> {
                   value: surface,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Icon(surface.icon, size: 20),
-                      const SizedBox(width: 8),
-                      Text(surface.label),
-                    ],
+                    children: <Widget>[Icon(surface.icon, size: 20), const SizedBox(width: 8), Text(surface.label)],
                   ),
                 ),
             ],
@@ -270,12 +268,7 @@ class _EmbedLabPageState extends State<EmbedLabPage> {
             child: Stack(
               children: <Widget>[
                 Positioned.fill(child: _buildSurface()),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: JsLogPanel(log: _log),
-                ),
+                Positioned(left: 0, right: 0, bottom: 0, child: JsLogPanel(log: _log)),
               ],
             ),
           ),
@@ -333,17 +326,17 @@ class _EmbedLabPageState extends State<EmbedLabPage> {
 
     return switch (surface) {
       EmbeddedSurface.reactDashboard => <Widget>[
-          chip('Dashboard', () => _invoke('navigate', <String, Object?>{'path': '#/dashboard'})),
-          chip('Charts', () => _invoke('navigate', <String, Object?>{'path': '#/charts'})),
-          chip('Cards', () => _invoke('navigate', <String, Object?>{'path': '#/components/cards'})),
-          chip('getState', () => _invoke('getState')),
-        ],
+        chip('Dashboard', () => _invoke('navigate', <String, Object?>{'path': '#/dashboard'})),
+        chip('Charts', () => _invoke('navigate', <String, Object?>{'path': '#/charts'})),
+        chip('Cards', () => _invoke('navigate', <String, Object?>{'path': '#/components/cards'})),
+        chip('getState', () => _invoke('getState')),
+      ],
       EmbeddedSurface.internalState => <Widget>[
-          chip('count +1', () => setState(() => _count++)),
-          chip(_darkTheme ? 'Light theme' : 'Dark theme', () => setState(() => _darkTheme = !_darkTheme)),
-          chip('ping', () => _emit('ping', <String, Object?>{'at': DateTime.now().toIso8601String()})),
-          chip('describe', () => _invoke('describe')),
-        ],
+        chip('count +1', () => setState(() => _count++)),
+        chip(_darkTheme ? 'Light theme' : 'Dark theme', () => setState(() => _darkTheme = !_darkTheme)),
+        chip('ping', () => _emit('ping', <String, Object?>{'at': DateTime.now().toIso8601String()})),
+        chip('describe', () => _invoke('describe')),
+      ],
     };
   }
 
@@ -552,7 +545,10 @@ class _LogLine extends StatelessWidget {
         TextSpan(
           style: mono.copyWith(color: Colors.white),
           children: <InlineSpan>[
-            TextSpan(text: '$stamp ', style: mono.copyWith(color: Colors.white38)),
+            TextSpan(
+              text: '$stamp ',
+              style: mono.copyWith(color: Colors.white38),
+            ),
             TextSpan(
               text: '${entry.source.tag.padRight(4)} ',
               style: mono.copyWith(color: entry.source.color, fontWeight: FontWeight.w700),

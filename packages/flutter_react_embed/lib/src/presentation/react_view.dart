@@ -45,10 +45,10 @@ enum ReactExecutionEnvironment {
   /// Whether [engine] can run in this environment. Flutter web cannot host
   /// React Native, which needs a native JS runtime.
   bool supports(ReactEngineKind engine) => switch (this) {
-        ReactExecutionEnvironment.android || ReactExecutionEnvironment.ios => true,
-        ReactExecutionEnvironment.web => engine == ReactEngineKind.web,
-        ReactExecutionEnvironment.unsupported => false,
-      };
+    ReactExecutionEnvironment.android || ReactExecutionEnvironment.ios => true,
+    ReactExecutionEnvironment.web => engine == ReactEngineKind.web,
+    ReactExecutionEnvironment.unsupported => false,
+  };
 }
 
 /// How an Android platform view is composited into the Flutter scene.
@@ -93,9 +93,7 @@ final class ReactViewConfiguration {
         return null;
       }
       if (value is! T) {
-        throw ReactConfigurationException(
-          'Attribute "$key" must be a $T, got ${value.runtimeType}',
-        );
+        throw ReactConfigurationException('Attribute "$key" must be a $T, got ${value.runtimeType}');
       }
       return value;
     }
@@ -181,23 +179,13 @@ final class ReactViewConfiguration {
       _deepEquality.equals(initialProps, other.initialProps);
 
   @override
-  int get hashCode => Object.hash(
-        engine,
-        moduleName,
-        cacheKey,
-        androidComposition,
-        hitTestBehavior,
-        _deepEquality.hash(initialProps),
-      );
+  int get hashCode =>
+      Object.hash(engine, moduleName, cacheKey, androidComposition, hitTestBehavior, _deepEquality.hash(initialProps));
 }
 
 /// Builds the widget shown when a [ReactView] fails. Call [retry] to tear the
 /// view down and boot it again.
-typedef ReactViewErrorBuilder = Widget Function(
-  BuildContext context,
-  ReactEmbedException error,
-  VoidCallback retry,
-);
+typedef ReactViewErrorBuilder = Widget Function(BuildContext context, ReactEmbedException error, VoidCallback retry);
 
 /// Receives errors raised by a [ReactView].
 typedef ReactViewErrorCallback = void Function(ReactEmbedException error, StackTrace stackTrace);
@@ -330,7 +318,8 @@ class _ReactViewState extends State<ReactView> {
   @override
   void didUpdateWidget(ReactView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final bool remount = widget.configuration.requiresNewSurface(oldWidget.configuration) ||
+    final bool remount =
+        widget.configuration.requiresNewSurface(oldWidget.configuration) ||
         widget.runtime != oldWidget.runtime ||
         widget.surfaceCache != oldWidget.surfaceCache;
     if (remount) {
@@ -447,23 +436,27 @@ class _ReactViewState extends State<ReactView> {
 
   void _watchRuntime(ReactRuntimeHandle runtime, int generation) {
     _subscriptions
-      ..add(_platform.runtimeErrors(runtime).listen((ReactRuntimeError error) {
-        final ReactJsRuntimeException exception = error.toException();
-        if (error.isFatal) {
-          _fail(exception, StackTrace.current, generation);
-        } else {
-          _report(exception, StackTrace.current);
-        }
-      }))
-      ..add(_platform.runtimeStates(runtime).listen((ReactRuntimeState state) {
-        if (state == ReactRuntimeState.crashed || state == ReactRuntimeState.disposed) {
-          _fail(
-            ReactJsRuntimeException('React runtime ${runtime.id} is ${state.name}', isFatal: true),
-            StackTrace.current,
-            generation,
-          );
-        }
-      }));
+      ..add(
+        _platform.runtimeErrors(runtime).listen((ReactRuntimeError error) {
+          final ReactJsRuntimeException exception = error.toException();
+          if (error.isFatal) {
+            _fail(exception, StackTrace.current, generation);
+          } else {
+            _report(exception, StackTrace.current);
+          }
+        }),
+      )
+      ..add(
+        _platform.runtimeStates(runtime).listen((ReactRuntimeState state) {
+          if (state == ReactRuntimeState.crashed || state == ReactRuntimeState.disposed) {
+            _fail(
+              ReactJsRuntimeException('React runtime ${runtime.id} is ${state.name}', isFatal: true),
+              StackTrace.current,
+              generation,
+            );
+          }
+        }),
+      );
   }
 
   void _handlePlatformViewCreated(int viewId, int generation) {
@@ -518,9 +511,11 @@ class _ReactViewState extends State<ReactView> {
       // The cache now decides when the surface (and an owned runtime) dies.
       unawaited(_cache.release(cacheKey));
     } else if (runtime != null && _ownsRuntime) {
-      unawaited(_platform.disposeEngine(runtime).catchError((Object error, StackTrace stackTrace) {
-        _report(_asReactError(error), stackTrace);
-      }));
+      unawaited(
+        _platform.disposeEngine(runtime).catchError((Object error, StackTrace stackTrace) {
+          _report(_asReactError(error), stackTrace);
+        }),
+      );
     }
     _ownsRuntime = false;
   }
@@ -539,12 +534,14 @@ class _ReactViewState extends State<ReactView> {
       onError(error, stackTrace);
       return;
     }
-    FlutterError.reportError(FlutterErrorDetails(
-      exception: error,
-      stack: stackTrace,
-      library: 'flutter_react_embed',
-      context: ErrorDescription('in ReactView "${widget.configuration.moduleName}"'),
-    ));
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'flutter_react_embed',
+        context: ErrorDescription('in ReactView "${widget.configuration.moduleName}"'),
+      ),
+    );
   }
 
   static ReactEmbedException _asReactError(Object error) =>
@@ -558,13 +555,14 @@ class _ReactViewState extends State<ReactView> {
   Widget build(BuildContext context) {
     return switch (_phase) {
       _Booting() => widget.placeholderBuilder?.call(context) ?? const SizedBox.shrink(),
-      _Failed(:final ReactEmbedException error) => widget.errorBuilder?.call(context, error, _restart) ??
-          (kDebugMode ? ErrorWidget(error) : const SizedBox.shrink()),
+      _Failed(:final ReactEmbedException error) =>
+        widget.errorBuilder?.call(context, error, _restart) ??
+            (kDebugMode ? ErrorWidget(error) : const SizedBox.shrink()),
       final _Ready ready => KeyedSubtree(
-          // A new generation must produce a new native view.
-          key: ValueKey<int>(_generation),
-          child: _buildPlatformView(context, ready),
-        ),
+        // A new generation must produce a new native view.
+        key: ValueKey<int>(_generation),
+        child: _buildPlatformView(context, ready),
+      ),
     };
   }
 
@@ -589,36 +587,38 @@ class _ReactViewState extends State<ReactView> {
           onCreatePlatformView: (PlatformViewCreationParams params) {
             final AndroidViewController controller = switch (config.androidComposition) {
               AndroidCompositionMode.textureLayer => PlatformViewsService.initSurfaceAndroidView(
-                  id: params.id,
-                  viewType: viewType,
-                  layoutDirection: direction,
-                  creationParams: ready.creationParams,
-                  creationParamsCodec: const StandardMessageCodec(),
-                  onFocus: () => params.onFocusChanged(true),
-                ),
+                id: params.id,
+                viewType: viewType,
+                layoutDirection: direction,
+                creationParams: ready.creationParams,
+                creationParamsCodec: const StandardMessageCodec(),
+                onFocus: () => params.onFocusChanged(true),
+              ),
               AndroidCompositionMode.hybrid => PlatformViewsService.initExpensiveAndroidView(
-                  id: params.id,
-                  viewType: viewType,
-                  layoutDirection: direction,
-                  creationParams: ready.creationParams,
-                  creationParamsCodec: const StandardMessageCodec(),
-                  onFocus: () => params.onFocusChanged(true),
-                ),
+                id: params.id,
+                viewType: viewType,
+                layoutDirection: direction,
+                creationParams: ready.creationParams,
+                creationParamsCodec: const StandardMessageCodec(),
+                onFocus: () => params.onFocusChanged(true),
+              ),
             };
             controller
               ..addOnPlatformViewCreatedListener(params.onPlatformViewCreated)
               ..addOnPlatformViewCreatedListener(onCreated);
-            unawaited(controller.create().catchError((Object error, StackTrace stackTrace) {
-              _fail(
-                ReactEngineInitializationException(
-                  'Android platform view creation failed: $error',
-                  code: 'PLATFORM_VIEW_CREATE_FAILED',
-                  cause: error,
-                ),
-                stackTrace,
-                generation,
-              );
-            }));
+            unawaited(
+              controller.create().catchError((Object error, StackTrace stackTrace) {
+                _fail(
+                  ReactEngineInitializationException(
+                    'Android platform view creation failed: $error',
+                    code: 'PLATFORM_VIEW_CREATE_FAILED',
+                    cause: error,
+                  ),
+                  stackTrace,
+                  generation,
+                );
+              }),
+            );
             return controller;
           },
         );

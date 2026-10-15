@@ -69,10 +69,7 @@ abstract final class JsonSafety {
 
   static void _validate(Object? value, String path, int depth) {
     if (depth > maxDepth) {
-      throw ReactSerializationException(
-        'Nesting deeper than $maxDepth levels (cyclic structure?)',
-        path: path,
-      );
+      throw ReactSerializationException('Nesting deeper than $maxDepth levels (cyclic structure?)', path: path);
     }
     switch (value) {
       case null || bool() || String():
@@ -87,10 +84,7 @@ abstract final class JsonSafety {
         }
       case double():
         if (!value.isFinite) {
-          throw ReactSerializationException(
-            'Non-finite double $value is not valid JSON',
-            path: path,
-          );
+          throw ReactSerializationException('Non-finite double $value is not valid JSON', path: path);
         }
       case List<Object?>():
         for (int i = 0; i < value.length; i++) {
@@ -100,10 +94,7 @@ abstract final class JsonSafety {
         for (final MapEntry<Object?, Object?> entry in value.entries) {
           final Object? key = entry.key;
           if (key is! String) {
-            throw ReactSerializationException(
-              'Map key $key (${key.runtimeType}) is not a String',
-              path: path,
-            );
+            throw ReactSerializationException('Map key $key (${key.runtimeType}) is not a String', path: path);
           }
           _validate(entry.value, '$path.$key', depth + 1);
         }
@@ -142,11 +133,11 @@ final class JsonRpcRequest extends JsonRpcMessage {
 
   @override
   JsonMap toJson() => <String, Object?>{
-        'jsonrpc': '2.0',
-        'id': id,
-        'method': method,
-        if (params != null) 'params': params,
-      };
+    'jsonrpc': '2.0',
+    'id': id,
+    'method': method,
+    if (params != null) 'params': params,
+  };
 }
 
 /// A call without a response (an event).
@@ -161,11 +152,7 @@ final class JsonRpcNotification extends JsonRpcMessage {
   final Object? params;
 
   @override
-  JsonMap toJson() => <String, Object?>{
-        'jsonrpc': '2.0',
-        'method': method,
-        if (params != null) 'params': params,
-      };
+  JsonMap toJson() => <String, Object?>{'jsonrpc': '2.0', 'method': method, if (params != null) 'params': params};
 }
 
 /// A successful response.
@@ -215,21 +202,14 @@ final class JsonRpcError {
   final Object? data;
 
   /// JSON representation.
-  JsonMap toJson() => <String, Object?>{
-        'code': code,
-        'message': message,
-        if (data != null) 'data': data,
-      };
+  JsonMap toJson() => <String, Object?>{'code': code, 'message': message, if (data != null) 'data': data};
 
   /// Converts the error into the matching [ReactEmbedException] subtype.
   ReactEmbedException toException() {
     if (code == JsonRpcErrorCode.jsRuntimeException) {
       final Object? details = data;
       final Object? stack = details is Map<String, Object?> ? details['stack'] : null;
-      return ReactJsRuntimeException(
-        message,
-        jsStack: stack is String ? stack : null,
-      );
+      return ReactJsRuntimeException(message, jsStack: stack is String ? stack : null);
     }
     return ReactRpcException(message, code: code, data: data);
   }
@@ -313,15 +293,14 @@ final class JsonRpcCodec {
   void _checkSize(String frame) {
     final int bytes = utf8.encode(frame).length;
     if (bytes > maxMessageBytes) {
-      throw ReactSerializationException(
-        'Encoded frame is $bytes bytes; limit is $maxMessageBytes',
-        path: r'$',
-      );
+      throw ReactSerializationException('Encoded frame is $bytes bytes; limit is $maxMessageBytes', path: r'$');
     }
   }
 
-  static JsonRpcFailure _reject(Object? id, int code, String message) =>
-      JsonRpcFailure(id: id, error: JsonRpcError(code: code, message: message));
+  static JsonRpcFailure _reject(Object? id, int code, String message) => JsonRpcFailure(
+    id: id,
+    error: JsonRpcError(code: code, message: message),
+  );
 
   static JsonRpcMessage _decodeOne(Object? entry) {
     if (entry is! Map<String, Object?>) {
@@ -399,12 +378,12 @@ typedef JsonRpcFrameSink = Future<void> Function(String frame);
 final class JsonRpcEndpoint {
   /// Creates an endpoint that writes frames through [send].
   JsonRpcEndpoint({
-    required JsonRpcFrameSink send,
+    required this._send,
     required this.runtimeId,
     this.codec = const JsonRpcCodec(),
     this.defaultTimeout = const Duration(seconds: 10),
     this.onProtocolError,
-  }) : _send = send;
+  });
 
   /// Runtime this endpoint talks to; used in error messages.
   final String runtimeId;
@@ -424,8 +403,9 @@ final class JsonRpcEndpoint {
   final JsonRpcFrameSink _send;
   final Map<Object, _PendingRequest> _pending = HashMap<Object, _PendingRequest>();
   final Map<String, ReactRpcHandler> _handlers = <String, ReactRpcHandler>{};
-  final StreamController<JsonRpcNotification> _notifications =
-      StreamController<JsonRpcNotification>.broadcast(sync: false);
+  final StreamController<JsonRpcNotification> _notifications = StreamController<JsonRpcNotification>.broadcast(
+    sync: false,
+  );
   int _nextId = 1;
   bool _closed = false;
 
@@ -561,13 +541,15 @@ final class JsonRpcEndpoint {
   Future<void> _dispatch(JsonRpcRequest request) async {
     final ReactRpcHandler? handler = _handlers[request.method];
     if (handler == null) {
-      await _trySend(JsonRpcFailure(
-        id: request.id,
-        error: JsonRpcError(
-          code: JsonRpcErrorCode.methodNotFound,
-          message: 'No Dart handler registered for "${request.method}"',
+      await _trySend(
+        JsonRpcFailure(
+          id: request.id,
+          error: JsonRpcError(
+            code: JsonRpcErrorCode.methodNotFound,
+            message: 'No Dart handler registered for "${request.method}"',
+          ),
         ),
-      ));
+      );
       return;
     }
 

@@ -22,3 +22,6 @@ linter:
     - prefer_final_locals
     - public_member_api_docs
     - unawaited_futures
+
+formatter:
+  page_width: 120

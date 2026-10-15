@@ -102,12 +102,7 @@ abstract class FlutterReactEmbedPlatform extends PlatformInterface {
   ///
   /// [params] must be a [JsonMap], a `List<Object?>` or `null`. When
   /// [timeout] is omitted, [ReactEngineConfig.requestTimeout] applies.
-  Future<Object?> invoke(
-    ReactRuntimeHandle runtime,
-    String method, {
-    Object? params,
-    Duration? timeout,
-  }) {
+  Future<Object?> invoke(ReactRuntimeHandle runtime, String method, {Object? params, Duration? timeout}) {
     throw UnimplementedError('invoke() has not been implemented.');
   }
 
@@ -123,11 +118,7 @@ abstract class FlutterReactEmbedPlatform extends PlatformInterface {
   ///
   /// Returns a disposer that unregisters the handler. Throws [StateError] if
   /// [method] already has a handler on [runtime].
-  ReactHandlerDisposer registerHandler(
-    ReactRuntimeHandle runtime,
-    String method,
-    ReactRpcHandler handler,
-  ) {
+  ReactHandlerDisposer registerHandler(ReactRuntimeHandle runtime, String method, ReactRpcHandler handler) {
     throw UnimplementedError('registerHandler() has not been implemented.');
   }
 

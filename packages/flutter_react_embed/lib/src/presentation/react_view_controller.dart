@@ -12,8 +12,8 @@ final class ReactViewController {
   ReactViewController.internal({
     required this.runtime,
     required this.viewId,
-    required FlutterReactEmbedPlatform platform,
-  }) : _platform = platform;
+    required this._platform,
+  });
 
   /// Runtime rendering this view.
   final ReactRuntimeHandle runtime;
@@ -45,9 +45,7 @@ final class ReactViewController {
     if (result is T) {
       return result;
     }
-    throw ReactProtocolException(
-      'JS method "$method" returned ${result.runtimeType}, expected $T',
-    );
+    throw ReactProtocolException('JS method "$method" returned ${result.runtimeType}, expected $T');
   }
 
   /// Sends the event [name] to JavaScript.

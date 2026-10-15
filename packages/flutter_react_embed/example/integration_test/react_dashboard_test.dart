@@ -18,25 +18,27 @@ void main() {
     final List<ReactBridgeEvent> events = <ReactBridgeEvent>[];
     final List<ReactEmbedException> errors = <ReactEmbedException>[];
 
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: ReactView(
-          configuration: ReactViewConfiguration(
-            engine: ReactEngineConfig(
-              engine: ReactEngineKind.web,
-              bundle: reactAppManifest.bundle,
-              bundleSha256: reactAppManifest.indexSha256,
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ReactView(
+            configuration: ReactViewConfiguration(
+              engine: ReactEngineConfig(
+                engine: ReactEngineKind.web,
+                bundle: reactAppManifest.bundle,
+                bundleSha256: reactAppManifest.indexSha256,
+              ),
+              moduleName: '#/dashboard',
             ),
-            moduleName: '#/dashboard',
+            onViewCreated: (ReactViewController c) {
+              c.events().listen(events.add);
+              if (!created.isCompleted) created.complete(c);
+            },
+            onError: (ReactEmbedException e, StackTrace _) => errors.add(e),
           ),
-          onViewCreated: (ReactViewController c) {
-            c.events().listen(events.add);
-            if (!created.isCompleted) created.complete(c);
-          },
-          onError: (ReactEmbedException e, StackTrace _) => errors.add(e),
         ),
       ),
-    ));
+    );
     final ReactViewController controller = await _pumpUntil(tester, created.future);
 
     // The shim's readiness frame (replayed to the first listener) and the
@@ -53,7 +55,10 @@ void main() {
     await _pumpUntil(tester, controller.invoke<Object?>('navigate', params: <String, Object?>{'path': '#/charts'}));
     final ReactBridgeEvent route = await _pumpUntil(
       tester,
-      _waitFor(events, (ReactBridgeEvent e) => e.name == 'route' && (e.data! as Map<String, Object?>)['hash'] == '#/charts'),
+      _waitFor(
+        events,
+        (ReactBridgeEvent e) => e.name == 'route' && (e.data! as Map<String, Object?>)['hash'] == '#/charts',
+      ),
     );
     expect((route.data! as Map<String, Object?>)['trigger'], anyOf('popstate', 'hashchange'));
 
@@ -108,13 +113,16 @@ Future<T> _pumpUntil<T>(WidgetTester tester, Future<T> future, {Duration timeout
   bool done = false;
   late T value;
   Object? error;
-  future.then((T v) {
-    value = v;
-    done = true;
-  }, onError: (Object e) {
-    error = e;
-    done = true;
-  });
+  future.then(
+    (T v) {
+      value = v;
+      done = true;
+    },
+    onError: (Object e) {
+      error = e;
+      done = true;
+    },
+  );
   final DateTime deadline = DateTime.now().add(timeout);
   while (!done) {
     if (DateTime.now().isAfter(deadline)) throw TimeoutException('_pumpUntil timed out', timeout);
@@ -124,7 +132,11 @@ Future<T> _pumpUntil<T>(WidgetTester tester, Future<T> future, {Duration timeout
   return value;
 }
 
-Future<void> _pumpUntilFound(WidgetTester tester, Finder finder, {Duration timeout = const Duration(seconds: 30)}) async {
+Future<void> _pumpUntilFound(
+  WidgetTester tester,
+  Finder finder, {
+  Duration timeout = const Duration(seconds: 30),
+}) async {
   final DateTime deadline = DateTime.now().add(timeout);
   while (finder.evaluate().isEmpty) {
     if (DateTime.now().isAfter(deadline)) {

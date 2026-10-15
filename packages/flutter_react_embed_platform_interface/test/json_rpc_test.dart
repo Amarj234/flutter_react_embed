@@ -21,24 +21,23 @@ void main() {
         () => JsonSafety.validate(<String, Object?>{
           'items': <Object?>[
             1,
-            <String, Object?>{'at': DateTime(2026)}
+            <String, Object?>{'at': DateTime(2026)},
           ],
         }),
-        throwsA(isA<ReactSerializationException>()
-            .having((ReactSerializationException e) => e.path, 'path', r'$.items[1].at')),
+        throwsA(
+          isA<ReactSerializationException>().having(
+            (ReactSerializationException e) => e.path,
+            'path',
+            r'$.items[1].at',
+          ),
+        ),
       );
     });
 
     test('rejects NaN, unsafe integers and non-string keys', () {
       expect(() => JsonSafety.validate(double.nan), throwsA(isA<ReactSerializationException>()));
-      expect(
-        () => JsonSafety.validate(JsonSafety.maxSafeInteger + 1),
-        throwsA(isA<ReactSerializationException>()),
-      );
-      expect(
-        () => JsonSafety.validate(<Object?, Object?>{1: 'x'}),
-        throwsA(isA<ReactSerializationException>()),
-      );
+      expect(() => JsonSafety.validate(JsonSafety.maxSafeInteger + 1), throwsA(isA<ReactSerializationException>()));
+      expect(() => JsonSafety.validate(<Object?, Object?>{1: 'x'}), throwsA(isA<ReactSerializationException>()));
     });
 
     test('rejects cyclic structures via the depth limit', () {
@@ -52,16 +51,20 @@ void main() {
     const JsonRpcCodec codec = JsonRpcCodec();
 
     test('classifies requests, notifications and responses', () {
-      final JsonRpcDecodeResultMatcher result = JsonRpcDecodeResultMatcher(codec.decode(jsonEncode(<Object?>[
-        <String, Object?>{'jsonrpc': '2.0', 'id': 1, 'method': 'm', 'params': <Object?>[]},
-        <String, Object?>{'jsonrpc': '2.0', 'method': 'evt'},
-        <String, Object?>{'jsonrpc': '2.0', 'id': 'a', 'result': null},
-        <String, Object?>{
-          'jsonrpc': '2.0',
-          'id': 2,
-          'error': <String, Object?>{'code': -32000, 'message': 'boom'},
-        },
-      ])));
+      final JsonRpcDecodeResultMatcher result = JsonRpcDecodeResultMatcher(
+        codec.decode(
+          jsonEncode(<Object?>[
+            <String, Object?>{'jsonrpc': '2.0', 'id': 1, 'method': 'm', 'params': <Object?>[]},
+            <String, Object?>{'jsonrpc': '2.0', 'method': 'evt'},
+            <String, Object?>{'jsonrpc': '2.0', 'id': 'a', 'result': null},
+            <String, Object?>{
+              'jsonrpc': '2.0',
+              'id': 2,
+              'error': <String, Object?>{'code': -32000, 'message': 'boom'},
+            },
+          ]),
+        ),
+      );
       expect(result.types, <Type>[JsonRpcRequest, JsonRpcNotification, JsonRpcSuccess, JsonRpcFailure]);
       expect(result.rejectCodes, isEmpty);
     });
@@ -71,19 +74,24 @@ void main() {
     });
 
     test('rejects invalid entries but keeps valid ones in a batch', () {
-      final JsonRpcDecodeResultMatcher result = JsonRpcDecodeResultMatcher(codec.decode(jsonEncode(<Object?>[
-        <String, Object?>{'jsonrpc': '1.0', 'id': 7, 'method': 'old'},
-        <String, Object?>{'jsonrpc': '2.0', 'method': 'ok'},
-        <String, Object?>{'jsonrpc': '2.0', 'id': 3, 'method': 'bad', 'params': 5},
-      ])));
+      final JsonRpcDecodeResultMatcher result = JsonRpcDecodeResultMatcher(
+        codec.decode(
+          jsonEncode(<Object?>[
+            <String, Object?>{'jsonrpc': '1.0', 'id': 7, 'method': 'old'},
+            <String, Object?>{'jsonrpc': '2.0', 'method': 'ok'},
+            <String, Object?>{'jsonrpc': '2.0', 'id': 3, 'method': 'bad', 'params': 5},
+          ]),
+        ),
+      );
       expect(result.types, <Type>[JsonRpcNotification]);
       expect(result.rejectCodes, <int>[JsonRpcErrorCode.invalidRequest, JsonRpcErrorCode.invalidRequest]);
       expect(result.rejectIds, <Object?>[7, 3]);
     });
 
     test('rejects oversized frames', () {
-      final JsonRpcDecodeResultMatcher result =
-          JsonRpcDecodeResultMatcher(const JsonRpcCodec(maxMessageBytes: 16).decode('"${'x' * 64}"'));
+      final JsonRpcDecodeResultMatcher result = JsonRpcDecodeResultMatcher(
+        const JsonRpcCodec(maxMessageBytes: 16).decode('"${'x' * 64}"'),
+      );
       expect(result.rejectCodes, <int>[JsonRpcErrorCode.payloadTooLarge]);
     });
   });
@@ -118,19 +126,26 @@ void main() {
     test('maps a JS exception to ReactJsRuntimeException with its stack', () async {
       final Future<void> expectation = expectLater(
         endpoint.request('explode'),
-        throwsA(isA<ReactJsRuntimeException>()
-            .having((ReactJsRuntimeException e) => e.jsStack, 'jsStack', 'at App (App.tsx:4)')),
+        throwsA(
+          isA<ReactJsRuntimeException>().having(
+            (ReactJsRuntimeException e) => e.jsStack,
+            'jsStack',
+            'at App (App.tsx:4)',
+          ),
+        ),
       );
       await pumpEventQueue();
-      await endpoint.handleFrame(jsonEncode(<String, Object?>{
-        'jsonrpc': '2.0',
-        'id': sent.single['id'],
-        'error': <String, Object?>{
-          'code': JsonRpcErrorCode.jsRuntimeException,
-          'message': 'TypeError: x is undefined',
-          'data': <String, Object?>{'stack': 'at App (App.tsx:4)'},
-        },
-      }));
+      await endpoint.handleFrame(
+        jsonEncode(<String, Object?>{
+          'jsonrpc': '2.0',
+          'id': sent.single['id'],
+          'error': <String, Object?>{
+            'code': JsonRpcErrorCode.jsRuntimeException,
+            'message': 'TypeError: x is undefined',
+            'data': <String, Object?>{'stack': 'at App (App.tsx:4)'},
+          },
+        }),
+      );
       await expectation;
     });
 
@@ -157,26 +172,31 @@ void main() {
 
     test('dispatches JS requests to Dart handlers', () async {
       endpoint.registerMethod('double', (Object? params) => ((params! as List<Object?>).single! as int) * 2);
-      await endpoint.handleFrame(jsonEncode(<String, Object?>{
-        'jsonrpc': '2.0',
-        'id': 'js-1',
-        'method': 'double',
-        'params': <Object?>[21],
-      }));
+      await endpoint.handleFrame(
+        jsonEncode(<String, Object?>{
+          'jsonrpc': '2.0',
+          'id': 'js-1',
+          'method': 'double',
+          'params': <Object?>[21],
+        }),
+      );
       expect(sent.single, <String, Object?>{'jsonrpc': '2.0', 'id': 'js-1', 'result': 42});
     });
 
     test('answers unknown methods, typed and untyped handler failures', () async {
       endpoint
         ..registerMethod(
-            'invalid', (Object? _) => throw const ReactRpcException('bad', code: JsonRpcErrorCode.invalidParams))
+          'invalid',
+          (Object? _) => throw const ReactRpcException('bad', code: JsonRpcErrorCode.invalidParams),
+        )
         ..registerMethod('crash', (Object? _) => throw StateError('boom'))
         ..registerMethod('nonJson', (Object? _) => DateTime(2026));
       for (final String method in <String>['missing', 'invalid', 'crash', 'nonJson']) {
         await endpoint.handleFrame(jsonEncode(<String, Object?>{'jsonrpc': '2.0', 'id': method, 'method': method}));
       }
-      final List<Object?> codes =
-          sent.map((Map<String, Object?> m) => (m['error']! as Map<String, Object?>)['code']).toList();
+      final List<Object?> codes = sent
+          .map((Map<String, Object?> m) => (m['error']! as Map<String, Object?>)['code'])
+          .toList();
       expect(codes, <int>[
         JsonRpcErrorCode.methodNotFound,
         JsonRpcErrorCode.invalidParams,
@@ -190,8 +210,10 @@ void main() {
       await endpoint.handleFrame(jsonEncode(<String, Object?>{'jsonrpc': '2.0', 'method': 'cartChanged'}));
       expect((await event).method, 'cartChanged');
 
-      final Future<void> pending =
-          expectLater(endpoint.request('never'), throwsA(isA<ReactRuntimeDisposedException>()));
+      final Future<void> pending = expectLater(
+        endpoint.request('never'),
+        throwsA(isA<ReactRuntimeDisposedException>()),
+      );
       await pumpEventQueue();
       await endpoint.close();
       await pending;

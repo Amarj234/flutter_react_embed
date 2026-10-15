@@ -37,8 +37,8 @@ final class ReactSurfaceLease {
 final class ReactSurfaceCache {
   /// Creates a cache retaining at most [maxRetainedSurfaces] idle surfaces.
   ReactSurfaceCache({this.maxRetainedSurfaces = 2, FlutterReactEmbedPlatform? platform})
-      : assert(maxRetainedSurfaces >= 0),
-        _platformOverride = platform;
+    : assert(maxRetainedSurfaces >= 0),
+      _platformOverride = platform;
 
   /// Process-wide cache used by `ReactView` unless another one is supplied.
   static final ReactSurfaceCache shared = ReactSurfaceCache();
@@ -125,8 +125,9 @@ final class ReactSurfaceCache {
   }
 
   Future<void> _trim() async {
-    final List<MapEntry<String, _CacheEntry>> idle =
-        _entries.entries.where((MapEntry<String, _CacheEntry> e) => !e.value.inUse).toList();
+    final List<MapEntry<String, _CacheEntry>> idle = _entries.entries
+        .where((MapEntry<String, _CacheEntry> e) => !e.value.inUse)
+        .toList();
     final int excess = idle.length - maxRetainedSurfaces;
     if (excess <= 0) {
       return;
@@ -147,12 +148,14 @@ final class ReactSurfaceCache {
       }
     } on ReactEmbedException catch (error, stackTrace) {
       // Eviction is housekeeping; it must not surface into app code paths.
-      FlutterError.reportError(FlutterErrorDetails(
-        exception: error,
-        stack: stackTrace,
-        library: 'flutter_react_embed',
-        context: ErrorDescription('while evicting cached React surface "$cacheKey"'),
-      ));
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'flutter_react_embed',
+          context: ErrorDescription('while evicting cached React surface "$cacheKey"'),
+        ),
+      );
     }
   }
 }

@@ -27,11 +27,7 @@ sealed class ReactEmbedException implements Exception {
 /// `BUNDLE_INTEGRITY`, `ENGINE_INIT_FAILED` or `UNSUPPORTED_ENGINE`.
 final class ReactEngineInitializationException extends ReactEmbedException {
   /// Creates an initialization failure with a platform [code].
-  const ReactEngineInitializationException(
-    super.message, {
-    required this.code,
-    super.cause,
-  });
+  const ReactEngineInitializationException(super.message, {required this.code, super.cause});
 
   /// Platform-provided error code.
   final String code;
@@ -48,7 +44,7 @@ final class ReactEngineUnavailableException extends ReactEmbedException {
 final class ReactRuntimeDisposedException extends ReactEmbedException {
   /// Creates a disposed-runtime error for [runtimeId].
   const ReactRuntimeDisposedException(this.runtimeId, {String? reason})
-      : super(reason ?? 'React runtime "$runtimeId" is no longer available');
+    : super(reason ?? 'React runtime "$runtimeId" is no longer available');
 
   /// Id of the runtime that went away.
   final String runtimeId;
@@ -57,12 +53,7 @@ final class ReactRuntimeDisposedException extends ReactEmbedException {
 /// JavaScript threw, either inside an RPC handler or as an uncaught error.
 final class ReactJsRuntimeException extends ReactEmbedException {
   /// Creates a JS-side exception.
-  const ReactJsRuntimeException(
-    super.message, {
-    this.jsStack,
-    this.isFatal = false,
-    super.cause,
-  });
+  const ReactJsRuntimeException(super.message, {this.jsStack, this.isFatal = false, super.cause});
 
   /// The JS stack trace as reported by the runtime (source-mapped in debug).
   final String? jsStack;
@@ -88,7 +79,7 @@ final class ReactRpcException extends ReactEmbedException {
 final class ReactRpcTimeoutException extends ReactEmbedException {
   /// Creates a timeout error for [method].
   ReactRpcTimeoutException(this.method, this.timeout)
-      : super('RPC "$method" timed out after ${timeout.inMilliseconds} ms');
+    : super('RPC "$method" timed out after ${timeout.inMilliseconds} ms');
 
   /// The method that timed out.
   final String method;

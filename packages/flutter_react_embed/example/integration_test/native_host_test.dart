@@ -27,8 +27,16 @@ void main() {
 
       expect(await platform.invoke(rt, 'add', params: <String, Object?>{'a': 2, 'b': 3}), 5);
       expect(
-        await platform.invoke(rt, 'echo', params: <String, Object?>{'nested': <Object?>[1, 'two', null]}),
-        <String, Object?>{'nested': <Object?>[1, 'two', null]},
+        await platform.invoke(
+          rt,
+          'echo',
+          params: <String, Object?>{
+            'nested': <Object?>[1, 'two', null],
+          },
+        ),
+        <String, Object?>{
+          'nested': <Object?>[1, 'two', null],
+        },
       );
       await expectLater(
         platform.invoke(rt, 'throwError'),
@@ -36,7 +44,9 @@ void main() {
       );
       await expectLater(
         platform.invoke(rt, 'missing'),
-        throwsA(isA<ReactRpcException>().having((ReactRpcException e) => e.code, 'code', JsonRpcErrorCode.methodNotFound)),
+        throwsA(
+          isA<ReactRpcException>().having((ReactRpcException e) => e.code, 'code', JsonRpcErrorCode.methodNotFound),
+        ),
       );
 
       final Future<ReactBridgeEvent> pong = platform.events(rt, name: 'pong').first;
@@ -51,21 +61,38 @@ void main() {
   testWidgets('reports a missing bundle and the unsupported react_native engine', (WidgetTester tester) async {
     await expectLater(
       platform.initializeEngine(const ReactEngineConfig(engine: ReactEngineKind.web, bundle: 'assets/nope/')),
-      throwsA(isA<ReactEngineInitializationException>()
-          .having((ReactEngineInitializationException e) => e.code, 'code', 'BUNDLE_NOT_FOUND')),
+      throwsA(
+        isA<ReactEngineInitializationException>().having(
+          (ReactEngineInitializationException e) => e.code,
+          'code',
+          'BUNDLE_NOT_FOUND',
+        ),
+      ),
     );
     await expectLater(
       platform.initializeEngine(const ReactEngineConfig(engine: ReactEngineKind.reactNative, bundle: 'assets/x.hbc')),
-      throwsA(isA<ReactEngineInitializationException>()
-          .having((ReactEngineInitializationException e) => e.code, 'code', 'UNSUPPORTED_ENGINE')),
+      throwsA(
+        isA<ReactEngineInitializationException>().having(
+          (ReactEngineInitializationException e) => e.code,
+          'code',
+          'UNSUPPORTED_ENGINE',
+        ),
+      ),
     );
   });
 
   testWidgets('rejects a bundle whose sha256 does not match', (WidgetTester tester) async {
     await expectLater(
-      platform.initializeEngine(ReactEngineConfig(engine: ReactEngineKind.web, bundle: 'assets/demo_spa/', bundleSha256: '0' * 64)),
-      throwsA(isA<ReactEngineInitializationException>()
-          .having((ReactEngineInitializationException e) => e.code, 'code', 'BUNDLE_INTEGRITY')),
+      platform.initializeEngine(
+        ReactEngineConfig(engine: ReactEngineKind.web, bundle: 'assets/demo_spa/', bundleSha256: '0' * 64),
+      ),
+      throwsA(
+        isA<ReactEngineInitializationException>().having(
+          (ReactEngineInitializationException e) => e.code,
+          'code',
+          'BUNDLE_INTEGRITY',
+        ),
+      ),
     );
   });
 
@@ -74,25 +101,28 @@ void main() {
     final List<ReactEmbedException> errors = <ReactEmbedException>[];
 
     Widget app(int count) => MaterialApp(
-          home: Scaffold(
-            body: ReactView(
-              configuration: ReactViewConfiguration(
-                engine: _web,
-                moduleName: '/checkout',
-                initialProps: <String, Object?>{'count': count},
-              ),
-              onViewCreated: (ReactViewController c) {
-                if (!created.isCompleted) created.complete(c);
-              },
-              onError: (ReactEmbedException e, StackTrace _) => errors.add(e),
-            ),
+      home: Scaffold(
+        body: ReactView(
+          configuration: ReactViewConfiguration(
+            engine: _web,
+            moduleName: '/checkout',
+            initialProps: <String, Object?>{'count': count},
           ),
-        );
+          onViewCreated: (ReactViewController c) {
+            if (!created.isCompleted) created.complete(c);
+          },
+          onError: (ReactEmbedException e, StackTrace _) => errors.add(e),
+        ),
+      ),
+    );
 
     await tester.pumpWidget(app(0));
     final ReactViewController controller = await _pumpUntil(tester, created.future);
 
-    final Map<String, Object?> described = await _pumpUntil(tester, controller.invoke<Map<String, Object?>>('describe'));
+    final Map<String, Object?> described = await _pumpUntil(
+      tester,
+      controller.invoke<Map<String, Object?>>('describe'),
+    );
     final Map<String, Object?> mounted = described['mounted']! as Map<String, Object?>;
     expect(mounted['moduleName'], '/checkout');
     expect(mounted['props'], <String, Object?>{'count': 0});
@@ -115,13 +145,16 @@ Future<T> _pumpUntil<T>(WidgetTester tester, Future<T> future, {Duration timeout
   bool done = false;
   late T value;
   Object? error;
-  future.then((T v) {
-    value = v;
-    done = true;
-  }, onError: (Object e) {
-    error = e;
-    done = true;
-  });
+  future.then(
+    (T v) {
+      value = v;
+      done = true;
+    },
+    onError: (Object e) {
+      error = e;
+      done = true;
+    },
+  );
   final DateTime deadline = DateTime.now().add(timeout);
   while (!done) {
     if (DateTime.now().isAfter(deadline)) {

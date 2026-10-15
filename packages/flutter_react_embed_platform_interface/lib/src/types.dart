@@ -121,21 +121,19 @@ final class ReactEngineConfig {
     }
     final String? sha = bundleSha256;
     if (sha != null && !RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(sha)) {
-      throw const ReactConfigurationException(
-        'bundleSha256 must be 64 hexadecimal characters',
-      );
+      throw const ReactConfigurationException('bundleSha256 must be 64 hexadecimal characters');
     }
   }
 
   /// Encodes the configuration for the control channel.
   JsonMap toWire() => <String, Object?>{
-        'engine': engine.wireName,
-        'bundle': bundle,
-        'bundleSha256': bundleSha256,
-        'contractVersion': contractVersion,
-        'enableDebugging': enableDebugging,
-        'maxMessageBytes': maxMessageBytes,
-      };
+    'engine': engine.wireName,
+    'bundle': bundle,
+    'bundleSha256': bundleSha256,
+    'contractVersion': contractVersion,
+    'enableDebugging': enableDebugging,
+    'maxMessageBytes': maxMessageBytes,
+  };
 
   @override
   bool operator ==(Object other) =>
@@ -149,15 +147,8 @@ final class ReactEngineConfig {
       other.maxMessageBytes == maxMessageBytes;
 
   @override
-  int get hashCode => Object.hash(
-        engine,
-        bundle,
-        bundleSha256,
-        contractVersion,
-        enableDebugging,
-        requestTimeout,
-        maxMessageBytes,
-      );
+  int get hashCode =>
+      Object.hash(engine, bundle, bundleSha256, contractVersion, enableDebugging, requestTimeout, maxMessageBytes);
 }
 
 /// Opaque reference to a booted runtime.
@@ -228,11 +219,7 @@ final class ReactSurfaceCreationParams {
 @immutable
 final class ReactBridgeEvent {
   /// Creates an event.
-  const ReactBridgeEvent({
-    required this.runtime,
-    required this.name,
-    this.data,
-  });
+  const ReactBridgeEvent({required this.runtime, required this.name, this.data});
 
   /// Runtime that emitted the event.
   final ReactRuntimeHandle runtime;
@@ -251,12 +238,7 @@ final class ReactBridgeEvent {
 @immutable
 final class ReactRuntimeError {
   /// Creates a runtime error report.
-  const ReactRuntimeError({
-    required this.runtime,
-    required this.message,
-    this.jsStack,
-    this.isFatal = false,
-  });
+  const ReactRuntimeError({required this.runtime, required this.message, this.jsStack, this.isFatal = false});
 
   /// Runtime that failed.
   final ReactRuntimeHandle runtime;

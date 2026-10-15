@@ -2,7 +2,7 @@ name: flutter_react_embed_workspace
 publish_to: none
 
 environment:
-  sdk: ^3.6.0
+  sdk: ^3.13.0
 
 workspace:
   - packages/flutter_react_embed_platform_interface

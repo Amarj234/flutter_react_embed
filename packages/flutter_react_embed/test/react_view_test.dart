@@ -51,11 +51,11 @@ class FakeReactPlatform extends FlutterReactEmbedPlatform {
 }
 
 ReactViewConfiguration _config({JsonMap props = const <String, Object?>{}, String? cacheKey}) => ReactViewConfiguration(
-      engine: const ReactEngineConfig(engine: ReactEngineKind.reactNative, bundle: 'assets/checkout.hbc'),
-      moduleName: 'Checkout',
-      initialProps: props,
-      cacheKey: cacheKey,
-    );
+  engine: const ReactEngineConfig(engine: ReactEngineKind.reactNative, bundle: 'assets/checkout.hbc'),
+  moduleName: 'Checkout',
+  initialProps: props,
+  cacheKey: cacheKey,
+);
 
 void main() {
   late FakeReactPlatform platform;
@@ -65,34 +65,39 @@ void main() {
   Widget host(Widget child) => Directionality(textDirection: TextDirection.ltr, child: child);
 
   ReactView view(ReactViewConfiguration configuration, {ReactSurfaceCache? cache, Key? key}) => ReactView(
-        key: key,
-        configuration: configuration,
-        surfaceCache: cache,
-        onError: (ReactEmbedException e, StackTrace _) => reported.add(e),
-        errorBuilder: (BuildContext _, ReactEmbedException e, VoidCallback retry) =>
-            GestureDetector(onTap: retry, child: Text('error: ${e.runtimeType}')),
-      );
+    key: key,
+    configuration: configuration,
+    surfaceCache: cache,
+    onError: (ReactEmbedException e, StackTrace _) => reported.add(e),
+    errorBuilder: (BuildContext _, ReactEmbedException e, VoidCallback retry) =>
+        GestureDetector(onTap: retry, child: Text('error: ${e.runtimeType}')),
+  );
 
   setUp(() {
     platform = FakeReactPlatform();
     FlutterReactEmbedPlatform.instance = platform;
     platformViewCalls = <MethodCall>[];
     reported = <ReactEmbedException>[];
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform_views, (MethodCall call) async {
-      platformViewCalls.add(call);
-      return null;
-    });
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform_views,
+      (MethodCall call) async {
+        platformViewCalls.add(call);
+        return null;
+      },
+    );
   });
 
   tearDown(() async {
     await platform.close();
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform_views, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform_views,
+      null,
+    );
   });
 
-  testWidgets('boots a runtime, spawns a UiKitView and disposes the runtime with the view',
-      (WidgetTester tester) async {
+  testWidgets('boots a runtime, spawns a UiKitView and disposes the runtime with the view', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(host(view(_config(props: <String, Object?>{'total': 5}))));
     await tester.pumpAndSettle();
 
@@ -112,14 +117,18 @@ void main() {
   testWidgets('spawns a PlatformViewLink on Android for both composition modes', (WidgetTester tester) async {
     for (final AndroidCompositionMode mode in AndroidCompositionMode.values) {
       platformViewCalls.clear();
-      await tester.pumpWidget(host(view(
-        ReactViewConfiguration(
-          engine: const ReactEngineConfig(engine: ReactEngineKind.reactNative, bundle: 'assets/checkout.hbc'),
-          moduleName: 'Checkout',
-          androidComposition: mode,
+      await tester.pumpWidget(
+        host(
+          view(
+            ReactViewConfiguration(
+              engine: const ReactEngineConfig(engine: ReactEngineKind.reactNative, bundle: 'assets/checkout.hbc'),
+              moduleName: 'Checkout',
+              androidComposition: mode,
+            ),
+            key: ValueKey<AndroidCompositionMode>(mode),
+          ),
         ),
-        key: ValueKey<AndroidCompositionMode>(mode),
-      )));
+      );
       await tester.pumpAndSettle();
       expect(find.byType(PlatformViewLink), findsOneWidget, reason: mode.name);
       expect(find.byType(AndroidViewSurface), findsOneWidget, reason: mode.name);
@@ -158,11 +167,13 @@ void main() {
     await tester.pumpWidget(host(view(_config())));
     await tester.pumpAndSettle();
 
-    platform.errors.add(const ReactRuntimeError(
-      runtime: ReactRuntimeHandle(id: 'rt-0', engine: ReactEngineKind.reactNative),
-      message: 'Invariant Violation',
-      isFatal: true,
-    ));
+    platform.errors.add(
+      const ReactRuntimeError(
+        runtime: ReactRuntimeHandle(id: 'rt-0', engine: ReactEngineKind.reactNative),
+        message: 'Invariant Violation',
+        isFatal: true,
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('error: ReactJsRuntimeException'), findsOneWidget);
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
@@ -228,8 +239,11 @@ void main() {
         throwsA(isA<ReactConfigurationException>()),
       );
       expect(
-        () => ReactViewConfiguration.fromAttributes(
-            <String, Object?>{'engine': 'flash', 'bundle': 'b', 'moduleName': 'm'}),
+        () => ReactViewConfiguration.fromAttributes(<String, Object?>{
+          'engine': 'flash',
+          'bundle': 'b',
+          'moduleName': 'm',
+        }),
         throwsA(isA<ReactConfigurationException>()),
       );
       expect(

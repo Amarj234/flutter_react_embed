@@ -23,11 +23,9 @@ import '../flutter_react_embed_platform_interface.dart';
 /// [FlutterReactEmbedPlatform] backed by MethodChannels.
 class MethodChannelFlutterReactEmbed extends FlutterReactEmbedPlatform {
   /// Creates the implementation. Tests may inject channels.
-  MethodChannelFlutterReactEmbed({
-    MethodChannel? controlChannel,
-    MethodChannel? messageChannel,
-  })  : controlChannel = controlChannel ?? const MethodChannel(controlChannelName),
-        messageChannel = messageChannel ?? const MethodChannel(messageChannelName);
+  MethodChannelFlutterReactEmbed({MethodChannel? controlChannel, MethodChannel? messageChannel})
+    : controlChannel = controlChannel ?? const MethodChannel(controlChannelName),
+      messageChannel = messageChannel ?? const MethodChannel(messageChannelName);
 
   /// Name of the lifecycle channel.
   static const String controlChannelName = 'dev.flutter_react_embed/control';
@@ -127,12 +125,14 @@ class MethodChannelFlutterReactEmbed extends FlutterReactEmbedPlatform {
       // Nothing native to release.
     } on PlatformException catch (e, stackTrace) {
       // Disposal is best effort and must not throw into widget teardown.
-      FlutterError.reportError(FlutterErrorDetails(
-        exception: e,
-        stack: stackTrace,
-        library: 'flutter_react_embed',
-        context: ErrorDescription('while disposing React runtime ${runtime.id}'),
-      ));
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: e,
+          stack: stackTrace,
+          library: 'flutter_react_embed',
+          context: ErrorDescription('while disposing React runtime ${runtime.id}'),
+        ),
+      );
     }
   }
 
@@ -141,20 +141,13 @@ class MethodChannelFlutterReactEmbed extends FlutterReactEmbedPlatform {
     final String propsJson = JsonSafety.encode(props, path: r'$.props');
     await _guard(
       'updateProps',
-      () => controlChannel.invokeMethod<void>('updateProps', <String, Object?>{
-        'viewId': viewId,
-        'propsJson': propsJson,
-      }),
+      () =>
+          controlChannel.invokeMethod<void>('updateProps', <String, Object?>{'viewId': viewId, 'propsJson': propsJson}),
     );
   }
 
   @override
-  Future<Object?> invoke(
-    ReactRuntimeHandle runtime,
-    String method, {
-    Object? params,
-    Duration? timeout,
-  }) {
+  Future<Object?> invoke(ReactRuntimeHandle runtime, String method, {Object? params, Duration? timeout}) {
     return _session(runtime).endpoint.request(method, params: params, timeout: timeout);
   }
 
@@ -164,11 +157,7 @@ class MethodChannelFlutterReactEmbed extends FlutterReactEmbedPlatform {
   }
 
   @override
-  ReactHandlerDisposer registerHandler(
-    ReactRuntimeHandle runtime,
-    String method,
-    ReactRpcHandler handler,
-  ) {
+  ReactHandlerDisposer registerHandler(ReactRuntimeHandle runtime, String method, ReactRpcHandler handler) {
     return _session(runtime).endpoint.registerMethod(method, handler);
   }
 
@@ -262,18 +251,14 @@ class MethodChannelFlutterReactEmbed extends FlutterReactEmbedPlatform {
   void _bufferEarlyFrame(String runtimeId, String frame) {
     final List<String> frames = _earlyFrames.putIfAbsent(runtimeId, () => <String>[]);
     if (frames.length >= maxBufferedFramesPerRuntime) {
-      _reportProtocolError(ReactProtocolException(
-        '[$runtimeId] Early frame buffer full; dropping frame',
-      ));
+      _reportProtocolError(ReactProtocolException('[$runtimeId] Early frame buffer full; dropping frame'));
       return;
     }
     frames.add(frame);
     while (_earlyFrames.length > maxBufferedRuntimes) {
       final String evicted = _earlyFrames.keys.first;
       _earlyFrames.remove(evicted);
-      _reportProtocolError(ReactProtocolException(
-        'Dropped buffered frames for unknown runtime "$evicted"',
-      ));
+      _reportProtocolError(ReactProtocolException('Dropped buffered frames for unknown runtime "$evicted"'));
     }
   }
 
@@ -283,10 +268,7 @@ class MethodChannelFlutterReactEmbed extends FlutterReactEmbedPlatform {
 
   Future<void> _deliver(String runtimeId, String frame) async {
     try {
-      await messageChannel.invokeMethod<void>('deliver', <String, Object?>{
-        'runtimeId': runtimeId,
-        'frame': frame,
-      });
+      await messageChannel.invokeMethod<void>('deliver', <String, Object?>{'runtimeId': runtimeId, 'frame': frame});
     } on MissingPluginException catch (e) {
       throw ReactEngineUnavailableException('Native frame channel is not available', cause: e);
     } on PlatformException catch (e) {
@@ -314,10 +296,10 @@ class MethodChannelFlutterReactEmbed extends FlutterReactEmbedPlatform {
 
   /// Notifications carry `params` as an object; wrap scalars and lists.
   static Object? _wrapEventData(Object? data) => switch (data) {
-        null => null,
-        Map<String, Object?>() => data,
-        _ => <String, Object?>{'value': data},
-      };
+    null => null,
+    Map<String, Object?>() => data,
+    _ => <String, Object?>{'value': data},
+  };
 
   static Map<Object?, Object?> _argumentsOf(MethodCall call) {
     final Object? arguments = call.arguments;
@@ -333,20 +315,15 @@ class MethodChannelFlutterReactEmbed extends FlutterReactEmbedPlatform {
   static String _requireString(Map<Object?, Object?> args, String key, String method) {
     final Object? value = args[key];
     if (value is! String) {
-      throw PlatformException(
-        code: 'INVALID_ARGUMENTS',
-        message: '$method requires a String "$key"',
-      );
+      throw PlatformException(code: 'INVALID_ARGUMENTS', message: '$method requires a String "$key"');
     }
     return value;
   }
 
   static void _reportProtocolError(ReactProtocolException error) {
-    FlutterError.reportError(FlutterErrorDetails(
-      exception: error,
-      library: 'flutter_react_embed',
-      silent: !kDebugMode,
-    ));
+    FlutterError.reportError(
+      FlutterErrorDetails(exception: error, library: 'flutter_react_embed', silent: !kDebugMode),
+    );
   }
 }
 
@@ -401,10 +378,7 @@ final class _RuntimeSession {
     _state = state;
     states.add(state);
     if (state == ReactRuntimeState.crashed) {
-      endpoint.failPending(ReactJsRuntimeException(
-        'React runtime ${handle.id} crashed',
-        isFatal: true,
-      ));
+      endpoint.failPending(ReactJsRuntimeException('React runtime ${handle.id} crashed', isFatal: true));
     }
   }
 
