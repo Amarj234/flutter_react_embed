@@ -1,0 +1,30 @@
+name: flutter_react_embed
+description: Embed React Native surfaces and production React SPAs inside Flutter as micro-frontends.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.27.0"
+
+dependencies:
+  collection: ^1.18.0
+  flutter:
+    sdk: flutter
+  flutter_react_embed_android: ^0.1.0
+  flutter_react_embed_ios: ^0.1.0
+  flutter_react_embed_platform_interface: ^0.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        default_package: flutter_react_embed_android
+      ios:
+        default_package: flutter_react_embed_ios

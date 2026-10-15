@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The WebView engine serves bundles from APK assets; network access is
+         only needed if the embedded SPA calls remote APIs, so INTERNET is left
+         to the host app's manifest. -->
+</manifest>

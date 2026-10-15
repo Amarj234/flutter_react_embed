@@ -1,0 +1,12 @@
+name: flutter_react_embed_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.6.0
+
+workspace:
+  - packages/flutter_react_embed_platform_interface
+  - packages/flutter_react_embed
+  - packages/flutter_react_embed/example
+  - packages/flutter_react_embed_android
+  - packages/flutter_react_embed_ios

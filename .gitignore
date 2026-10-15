@@ -1,0 +1,20 @@
+# Dart / Flutter
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+.idea/
+.vscode/
+.DS_Store
+
+# Android
+.gradle/
+local.properties
+.cxx/
+
+# iOS
+Pods/
+.symlinks/
+xcuserdata/
+DerivedData/

@@ -1,0 +1,19 @@
+name: flutter_react_embed_platform_interface
+description: Federated platform contract, JSON-RPC bridge protocol and default MethodChannel implementation for flutter_react_embed.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.1.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0

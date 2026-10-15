@@ -1,0 +1,39 @@
+name: flutter_react_embed_example
+description: Demonstrates flutter_react_embed with an open-source React dashboard and runs its on-device integration tests.
+publish_to: none
+version: 1.0.0+1
+# Member of the repository's pub workspace (see the root pubspec.yaml), so the
+# federated packages (platform interface, Android, iOS) resolve from this
+# checkout too. Remove this line to build the example outside the workspace
+# and add the dependency_overrides shown in README.md.
+resolution: workspace
+
+environment:
+  sdk: ^3.6.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # The plugin under test, from this checkout: example/ lives inside the
+  # flutter_react_embed package, so its root is one level up.
+  flutter_react_embed:
+    path: ../
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    # Internal state view: hand-written fixture page.
+    - assets/demo_spa/
+    # Flutter does not include subdirectories of an asset directory, so every
+    # directory of the React build is listed. The block between the markers is
+    # rewritten by tool/setup_test_react.sh; do not edit it by hand.
+    # >>> react_app assets
+    - assets/react_app/
+    # <<< react_app assets
