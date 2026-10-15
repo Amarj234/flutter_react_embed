@@ -2,6 +2,10 @@
 
 All notable changes to this package are documented here. This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.0.2
+
+- Updated the author section in the README.
+
 ## 1.0.1
 
 Documentation only. No code changes.

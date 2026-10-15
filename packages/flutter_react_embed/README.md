@@ -926,7 +926,7 @@ flutter run
 
 ## Author
 
-Created and maintained by **[Amarj234](https://github.com/Amarj234)**.
+Created and maintained by **Amarjeet** ([@Amarj234](https://github.com/Amarj234)), Flutter developer.
 
 - 💼 LinkedIn: [linkedin.com/in/amarj234](https://www.linkedin.com/in/amarj234)
 - 🐙 GitHub: [github.com/Amarj234](https://github.com/Amarj234)
