@@ -31,6 +31,8 @@ flutter:
   assets:
     # Internal state view: hand-written fixture page.
     - assets/demo_spa/
+    # React Native probe bundle, built by tool/run_local_test.sh.
+    - assets/rn/
     # Flutter does not include subdirectories of an asset directory, so every
     # directory of the React build is listed. The block between the markers is
     # rewritten by tool/setup_test_react.sh; do not edit it by hand.

@@ -1,12 +1,16 @@
 import Flutter
 import UIKit
 
-/// Creates `ReactPlatformView`s for `dev.flutter_react_embed/view/web`.
+/// Creates `ReactPlatformView`s. One instance is registered per view type:
+/// `dev.flutter_react_embed/view/web` and
+/// `dev.flutter_react_embed/view/react_native`.
 final class ReactPlatformViewFactory: NSObject, FlutterPlatformViewFactory {
+  private let engine: String
   private let registry: RuntimeRegistry
   private weak var events: RuntimeEvents?
 
-  init(registry: RuntimeRegistry, events: RuntimeEvents) {
+  init(engine: String, registry: RuntimeRegistry, events: RuntimeEvents) {
+    self.engine = engine
     self.registry = registry
     self.events = events
     super.init()
@@ -19,14 +23,20 @@ final class ReactPlatformViewFactory: NSObject, FlutterPlatformViewFactory {
   func create(
     withFrame frame: CGRect, viewIdentifier viewId: Int64, arguments args: Any?
   ) -> FlutterPlatformView {
-    ReactPlatformView(frame: frame, viewId: viewId, arguments: args, registry: registry, events: events)
+    ReactPlatformView(
+      frame: frame, viewId: viewId, arguments: args, engine: engine, registry: registry, events: events)
   }
 }
 
 /// Flutter-side handle for one embedded React surface.
 ///
-/// The view is a plain container; the runtime's `WKWebView` is moved into it
-/// on creation. Creation never throws: Flutter cannot surface a factory error
+/// The view is a plain container that switches on the engine:
+///
+/// - `web`: the runtime's `WKWebView` is moved into it on creation.
+/// - `react_native`: an `RCTSurfaceHostingProxyRootView` is created (or a
+///   retained one reattached) on creation.
+///
+/// Creation never throws: Flutter cannot surface a factory error
 /// to Dart, so failures leave an empty container and are reported through
 /// `onRuntimeError` (non-fatal).
 ///
@@ -37,16 +47,18 @@ final class ReactPlatformViewFactory: NSObject, FlutterPlatformViewFactory {
 final class ReactPlatformView: NSObject, FlutterPlatformView {
   private let container: UIView
   private let viewId: Int64
+  private let engine: String
   private let registry: RuntimeRegistry
-  private weak var runtime: WebRuntime?
+  private weak var runtime: EmbedRuntime?
   private var cacheKey: String?
 
   init(
-    frame: CGRect, viewId: Int64, arguments: Any?, registry: RuntimeRegistry,
+    frame: CGRect, viewId: Int64, arguments: Any?, engine: String, registry: RuntimeRegistry,
     events: RuntimeEvents?
   ) {
     self.container = UIView(frame: frame)
     self.viewId = viewId
+    self.engine = engine
     self.registry = registry
     super.init()
     container.clipsToBounds = true
@@ -67,11 +79,14 @@ final class ReactPlatformView: NSObject, FlutterPlatformView {
   func view() -> UIView { container }
 
   private func mount(_ params: SurfaceParams) -> String? {
-    guard params.engine == FREProtocol.engineWeb else {
-      return "Engine \(params.engine) is not supported by this view type"
+    guard params.engine == engine else {
+      return "Engine \(params.engine) is not supported by the \(engine) view type"
     }
     guard let target = registry.runtime(params.runtimeId) else {
       return "Runtime \(params.runtimeId) does not exist or was disposed"
+    }
+    guard target.engine == params.engine else {
+      return "Runtime \(params.runtimeId) runs \(target.engine), not \(params.engine)"
     }
     if let error = target.attach(viewId: viewId, container: container, params: params) {
       return error
@@ -81,7 +96,7 @@ final class ReactPlatformView: NSObject, FlutterPlatformView {
     return nil
   }
 
-  /// Detaches the web view and unbinds the surface.
+  /// Detaches the surface and unbinds it.
   ///
   /// Flutter disposes platform views on the platform (main) thread. If the
   /// last reference is ever dropped elsewhere, the work is re-dispatched to

@@ -1,0 +1,22 @@
+{
+  "name": "fre-rn-probe",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Mock React Native app bundled by tool/run_local_test.sh. Versions must match react-android in the example's build.gradle.kts.",
+  "dependencies": {
+    "react": "19.2.3",
+    "react-native": "0.87.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/preset-env": "^7.25.3",
+    "@babel/runtime": "^7.25.0",
+    "@react-native-community/cli": "20.2.0",
+    "@react-native-community/cli-platform-android": "20.2.0",
+    "@react-native/babel-preset": "0.87.1",
+    "@react-native/metro-config": "0.87.1"
+  },
+  "engines": {
+    "node": ">= 22.11.0"
+  }
+}

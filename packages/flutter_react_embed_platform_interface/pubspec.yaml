@@ -1,6 +1,6 @@
 name: flutter_react_embed_platform_interface
 description: Platform interface, JSON-RPC protocol and default MethodChannel implementation for the flutter_react_embed plugin.
-version: 1.0.0
+version: 1.1.0
 repository: https://github.com/Amarj234/flutter_react_embed/tree/main/packages/flutter_react_embed_platform_interface
 issue_tracker: https://github.com/Amarj234/flutter_react_embed/issues
 topics:

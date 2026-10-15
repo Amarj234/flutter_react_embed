@@ -51,3 +51,9 @@ app.*.map.json
 /.react_src/
 /assets/react_app/*
 !/assets/react_app/.gitkeep
+
+# flutter_react_embed: React Native probe install and bundle (tool/run_local_test.sh)
+/.rn_mock/
+/.fre_test_logs/
+/assets/rn/*
+!/assets/rn/.gitkeep

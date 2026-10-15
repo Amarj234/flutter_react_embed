@@ -37,6 +37,34 @@ enum ReactEngineKind {
 
   /// Platform view type registered by the native implementation.
   String get viewType => 'dev.flutter_react_embed/view/$wireName';
+
+  /// The framework type this engine renders.
+  ReactEmbedType get embedType => ReactEmbedType.fromEngine(this);
+}
+
+/// Which React framework an embedded app is built with.
+///
+/// The framework-level view of [ReactEngineKind]: each type maps to exactly
+/// one engine, so either can be used wherever the other is accepted.
+enum ReactEmbedType {
+  /// A production React web build (`index.html` and its assets), rendered by
+  /// a plugin-owned WebView / WKWebView.
+  web(ReactEngineKind.web),
+
+  /// A compiled React Native bundle (`index.android.bundle` /
+  /// `main.jsbundle`), rendered by the app's React Native host.
+  native(ReactEngineKind.reactNative);
+
+  const ReactEmbedType(this.engine);
+
+  /// Engine that renders this type.
+  final ReactEngineKind engine;
+
+  /// The type rendered by [engine].
+  static ReactEmbedType fromEngine(ReactEngineKind engine) => switch (engine) {
+    ReactEngineKind.web => ReactEmbedType.web,
+    ReactEngineKind.reactNative => ReactEmbedType.native,
+  };
 }
 
 /// Lifecycle of a JavaScript runtime.
@@ -74,7 +102,8 @@ enum ReactRuntimeState {
 final class ReactEngineConfig {
   /// Creates an engine configuration.
   ///
-  /// [bundle] is a Flutter asset key: the `.hbc` bundle for
+  /// [bundle] is a Flutter asset key: the compiled bundle file
+  /// (`index.android.bundle`, `main.jsbundle`, or Hermes bytecode) for
   /// [ReactEngineKind.reactNative], or the SPA root directory (containing
   /// `index.html`) for [ReactEngineKind.web].
   const ReactEngineConfig({

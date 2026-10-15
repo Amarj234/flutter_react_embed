@@ -1,5 +1,5 @@
 group = "dev.flutterreactembed"
-version = "1.0.0"
+version = "1.1.0"
 
 buildscript {
     val kotlinVersion = "2.4.0"
@@ -56,4 +56,8 @@ dependencies {
     // WebViewAssetLoader, addWebMessageListener, addDocumentStartJavaScript.
     implementation("androidx.webkit:webkit:1.12.1")
     implementation("androidx.annotation:annotation:1.9.1")
+    // React Native engine (New Architecture). compileOnly: apps that use it add
+    // react-android and hermes-android themselves; web-only apps ship nothing
+    // extra. Built against 0.87; see ReactNativeSupport.
+    compileOnly("com.facebook.react:react-android:0.87.1")
 }

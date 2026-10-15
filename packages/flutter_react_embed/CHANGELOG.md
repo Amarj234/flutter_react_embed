@@ -2,6 +2,30 @@
 
 All notable changes to this package are documented here. This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.1.0
+
+Adds a React Native engine next to the React Web engine. No breaking changes: 1.0 code, the web engine and its JavaScript contract work unchanged.
+
+### Features
+
+- **React Native engine.** `ReactView` now renders React Native apps (New Architecture, React Native 0.82+) as well as React web builds. The engine is opt-in: web-only apps don't ship any React Native code. See "React Native engine" in the README.
+- `ReactEmbedType { web, native }`: the framework-level alias of `ReactEngineKind`, available as `ReactViewConfiguration.type` and `ReactEngineKind.embedType`.
+- `ReactViewConfiguration.web(assetPath:, route:, ...)` and `ReactViewConfiguration.native(bundleName:, iosBundleName:, componentName:, initialProps:, ...)` convenience constructors.
+- `ReactViewConfiguration.fromAttributes` accepts `type` (`web` | `native`), `bundleName` and `componentName` as aliases. Setting both an attribute and its alias is rejected.
+- `bundleSha256` pins the React Native bundle file, too.
+- `example/tool/fre-bridge-native.js`: a JSON-RPC bridge and `useFlutterBridge` hook for React Native components.
+- The example app can opt into the React Native Gradle plugin (`FRE_REACT_NATIVE=1`), with a mock React Native app (`tool/rn_probe`), a switching harness (`lib/hybrid_switch_main.dart`), `integration_test/hybrid_switch_test.dart` and `tool/run_local_test.sh`.
+
+### Verified
+
+- The React Web module is unchanged and still passes its 1.0 integration tests.
+- Android, on an API 37 emulator with React Native 0.87.1 (`example/tool/run_local_test.sh`): contract tests on both engines and 80 alternating web/native switches pass. No wrong-thread exceptions, no leaked WebView or Activity, and Java heap and View counts are flat between rounds.
+- iOS builds with the default (web) subspec. The React Native subspec is not yet compiled or run on a device.
+
+### Removed limitation
+
+- `ReactEngineKind.reactNative` no longer always fails with `UNSUPPORTED_ENGINE`. It still does when the app doesn't include React Native, with a message that explains what to add.
+
 ## 1.0.2
 
 - Updated the author section in the README.

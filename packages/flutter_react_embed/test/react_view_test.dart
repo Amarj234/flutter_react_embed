@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_react_embed/flutter_react_embed.dart';
@@ -218,7 +219,103 @@ void main() {
     expect(platform.calls, <String>['initializeEngine', 'initializeEngine', 'evict:cart', 'disposeEngine:rt-0']);
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
+  testWidgets('selects the platform view type from ReactEmbedType', (WidgetTester tester) async {
+    for (final ReactEmbedType type in ReactEmbedType.values) {
+      final ReactViewConfiguration configuration = switch (type) {
+        ReactEmbedType.web => ReactViewConfiguration.web(assetPath: 'assets/react_app/', route: '#/cart'),
+        ReactEmbedType.native => ReactViewConfiguration.native(
+          bundleName: 'assets/rn/index.android.bundle',
+          iosBundleName: 'assets/rn/main.jsbundle',
+          componentName: 'Checkout',
+        ),
+      };
+      await tester.pumpWidget(host(view(configuration, key: ValueKey<ReactEmbedType>(type))));
+      await tester.pumpAndSettle();
+
+      final UiKitView uiKitView = tester.widget<UiKitView>(find.byType(UiKitView));
+      expect(uiKitView.viewType, 'dev.flutter_react_embed/view/${type.engine.wireName}', reason: type.name);
+      final Map<Object?, Object?> params = uiKitView.creationParams! as Map<Object?, Object?>;
+      expect(params['engine'], type.engine.wireName, reason: type.name);
+    }
+    expect(reported, isEmpty);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+
+  group('ReactEmbedType', () {
+    test('maps one to one onto ReactEngineKind', () {
+      expect(ReactEmbedType.web.engine, ReactEngineKind.web);
+      expect(ReactEmbedType.native.engine, ReactEngineKind.reactNative);
+      for (final ReactEngineKind engine in ReactEngineKind.values) {
+        expect(engine.embedType.engine, engine);
+      }
+    });
+
+    test('web() builds the same configuration as the explicit constructor', () {
+      expect(
+        ReactViewConfiguration.web(assetPath: 'assets/react_app/', route: '#/cart', cacheKey: 'cart'),
+        const ReactViewConfiguration(
+          engine: ReactEngineConfig(engine: ReactEngineKind.web, bundle: 'assets/react_app/'),
+          moduleName: '#/cart',
+          cacheKey: 'cart',
+        ),
+      );
+    });
+
+    test('native() picks the bundle for the target platform', () {
+      ReactViewConfiguration build() => ReactViewConfiguration.native(
+        bundleName: 'assets/rn/index.android.bundle',
+        iosBundleName: 'assets/rn/main.jsbundle',
+        componentName: 'Checkout',
+        initialProps: const <String, Object?>{'total': 5},
+      );
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      final ReactViewConfiguration android = build();
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      final ReactViewConfiguration ios = build();
+      debugDefaultTargetPlatformOverride = null;
+
+      expect(android.type, ReactEmbedType.native);
+      expect(android.engine.bundle, 'assets/rn/index.android.bundle');
+      expect(ios.engine.bundle, 'assets/rn/main.jsbundle');
+      expect(ios.moduleName, 'Checkout');
+      expect(ios.initialProps, const <String, Object?>{'total': 5});
+    });
+  });
+
   group('ReactViewConfiguration.fromAttributes', () {
+    test('accepts the type, bundleName and componentName aliases', () {
+      final ReactViewConfiguration config = ReactViewConfiguration.fromAttributes(<String, Object?>{
+        'type': 'native',
+        'bundleName': 'assets/rn/index.android.bundle',
+        'componentName': 'Checkout',
+      });
+      expect(config.type, ReactEmbedType.native);
+      expect(config.engine.engine, ReactEngineKind.reactNative);
+      expect(config.engine.bundle, 'assets/rn/index.android.bundle');
+      expect(config.moduleName, 'Checkout');
+    });
+
+    test('rejects an attribute set together with its alias', () {
+      expect(
+        () => ReactViewConfiguration.fromAttributes(<String, Object?>{
+          'engine': 'web',
+          'type': 'web',
+          'bundle': 'b',
+          'moduleName': 'm',
+        }),
+        throwsA(isA<ReactConfigurationException>()),
+      );
+      expect(
+        () => ReactViewConfiguration.fromAttributes(<String, Object?>{
+          'type': 'native',
+          'bundle': 'b',
+          'bundleName': 'c',
+          'moduleName': 'm',
+        }),
+        throwsA(isA<ReactConfigurationException>()),
+      );
+    });
+
     test('reads a complete manifest', () {
       final ReactViewConfiguration config = ReactViewConfiguration.fromAttributes(<String, Object?>{
         'engine': 'web',

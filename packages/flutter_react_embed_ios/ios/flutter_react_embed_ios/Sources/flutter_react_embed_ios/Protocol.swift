@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 /// Wire constants shared with `MethodChannelFlutterReactEmbed` (Dart) and the
 /// JS bridge package. Changing any value here is a protocol break.
@@ -6,6 +7,7 @@ enum FREProtocol {
   static let controlChannel = "dev.flutter_react_embed/control"
   static let messageChannel = "dev.flutter_react_embed/messages"
   static let viewTypeWeb = "dev.flutter_react_embed/view/web"
+  static let viewTypeReactNative = "dev.flutter_react_embed/view/react_native"
 
   static let engineWeb = "web"
   static let engineReactNative = "react_native"
@@ -19,6 +21,12 @@ enum FREProtocol {
   /// bridge frames; `freError` carries uncaught JS errors and rejections.
   static let frameHandler = "freNative"
   static let errorHandler = "freError"
+
+  /// React Native module name (`NativeModules.FlutterReactEmbed`) and its event.
+  static let rnModule = "FlutterReactEmbed"
+  static let rnFrameEvent = "freFrame"
+  /// Initial-props key carrying `{runtimeId, viewId, contractVersion, platform, cacheKey}`.
+  static let rnMetaProp = "__fre"
 
   static let stateReady = "ready"
   static let stateCrashed = "crashed"
@@ -51,7 +59,7 @@ enum FREError: Error {
   case invalidArguments(String)
   case unsupportedEngine(String)
   case bundleNotFound(String)
-  case bundleIntegrity(expected: String, actual: String)
+  case bundleIntegrity(expected: String, actual: String, file: String = "index.html")
   case engineInitFailed(String)
   case bootTimeout
   case engineDisposed(String)
@@ -81,8 +89,8 @@ enum FREError: Error {
     case .invalidArguments(let detail): return detail
     case .unsupportedEngine(let detail): return detail
     case .bundleNotFound(let path): return "No \(path) in the app's Flutter assets"
-    case .bundleIntegrity(let expected, let actual):
-      return "index.html sha256 is \(actual), expected \(expected)"
+    case .bundleIntegrity(let expected, let actual, let file):
+      return "\(file) sha256 is \(actual), expected \(expected)"
     case .engineInitFailed(let detail): return detail
     case .bootTimeout:
       return "JS did not send its first frame within \(Int(FREProtocol.bootTimeout)) s"
@@ -168,6 +176,25 @@ final class EmbedQueues {
   static func onMain(_ work: @escaping () -> Void) {
     if Thread.isMainThread { work() } else { DispatchQueue.main.async(execute: work) }
   }
+}
+
+/// One JavaScript runtime as seen by the plugin and its platform views.
+/// Implemented by `WebRuntime` and, with the `ReactNative` subspec,
+/// `NativeRuntime`. Main thread only.
+protocol EmbedRuntime: AnyObject {
+  var id: String { get }
+  /// `FREProtocol.engineWeb` or `FREProtocol.engineReactNative`.
+  var engine: String { get }
+  /// Whether a detached surface is retained under `cacheKey`.
+  func retains(_ cacheKey: String) -> Bool
+  func deliverFromDart(_ frame: String, completion: @escaping (FREError?) -> Void)
+  /// Shows a surface for `params` in `container`. Returns an error message, or nil.
+  func attach(viewId: Int64, container: UIView, params: SurfaceParams) -> String?
+  func detach(viewId: Int64, cacheKey: String?)
+  func evictCached(_ cacheKey: String)
+  func updateProps(viewId: Int64, props: [String: Any]) -> FREError?
+  /// Releases every resource. Idempotent.
+  func dispose()
 }
 
 /// Receives runtime output. Always invoked on the main thread.

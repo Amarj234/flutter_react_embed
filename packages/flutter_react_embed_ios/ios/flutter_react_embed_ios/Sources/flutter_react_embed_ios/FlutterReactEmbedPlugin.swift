@@ -11,10 +11,13 @@ import UIKit
 /// | messages | Dart -> native | deliver |
 /// | messages | native -> Dart | onFrame, onRuntimeState, onRuntimeError |
 ///
-/// Only the `web` engine is implemented. `react_native` is rejected with
-/// `UNSUPPORTED_ENGINE`; it needs a React Native host integration (RCTHost,
-/// Hermes, CocoaPods codegen) in the consuming app, which a plugin cannot
-/// provide.
+/// Engines:
+///
+/// - `web`: `WebRuntime`, always available.
+/// - `react_native`: `NativeRuntime` over a shared `RCTReactNativeFactory`.
+///   Compiled only with the `flutter_react_embed_ios/ReactNative` CocoaPods
+///   subspec (which defines `FRE_REACT_NATIVE`); otherwise the engine is
+///   rejected with `UNSUPPORTED_ENGINE`.
 ///
 /// One instance exists per FlutterEngine. Channel handlers run on the main
 /// thread; background work goes through `EmbedQueues`.
@@ -43,8 +46,14 @@ public final class FlutterReactEmbedPlugin: NSObject, FlutterPlugin {
       instance.handleMessage(call, result: result)
     }
     registrar.register(
-      ReactPlatformViewFactory(registry: instance.registry, events: instance),
+      ReactPlatformViewFactory(engine: FREProtocol.engineWeb, registry: instance.registry, events: instance),
       withId: FREProtocol.viewTypeWeb)
+    // Registered even without React Native, so a misconfigured app gets a
+    // reported error instead of an unknown-view-type crash.
+    registrar.register(
+      ReactPlatformViewFactory(
+        engine: FREProtocol.engineReactNative, registry: instance.registry, events: instance),
+      withId: FREProtocol.viewTypeReactNative)
   }
 
   public func detachFromEngine(for registrar: FlutterPluginRegistrar) {
@@ -73,7 +82,7 @@ public final class FlutterReactEmbedPlugin: NSObject, FlutterPlugin {
       guard let cacheKey = args?["cacheKey"] as? String else {
         return result(FREError.invalidArguments("cacheKey is required").flutterError)
       }
-      registry.runtimeRetaining(cacheKey)?.evictCached(cacheKey)
+      registry.runtimes(retaining: cacheKey).forEach { $0.evictCached(cacheKey) }
       result(nil)
     default:
       result(FlutterMethodNotImplemented)
@@ -108,10 +117,7 @@ public final class FlutterReactEmbedPlugin: NSObject, FlutterPlugin {
     case FREProtocol.engineWeb:
       break
     case FREProtocol.engineReactNative:
-      return reply.error(
-        .unsupportedEngine(
-          "The react_native engine requires a React Native host integration in the app; "
-            + "this build of flutter_react_embed_ios provides the web engine only"))
+      return initializeNativeEngine(config: config, reply: reply)
     default:
       return reply.error(.unsupportedEngine("Unknown engine \(config.engine)"))
     }
@@ -152,6 +158,47 @@ public final class FlutterReactEmbedPlugin: NSObject, FlutterPlugin {
         reply.success(["runtimeId": runtime.id])
       }
     }
+  }
+
+  private func initializeNativeEngine(config: RuntimeConfig, reply: SingleReply) {
+    #if FRE_REACT_NATIVE
+      guard let registrar else { return reply.error(.engineDisposed("Plugin is detached")) }
+      let key = registrar.lookupKey(forAsset: config.bundle)
+      guard let path = Bundle.main.path(forResource: key, ofType: nil) else {
+        return reply.error(.bundleNotFound(config.bundle))
+      }
+      let bundleURL = URL(fileURLWithPath: path, isDirectory: false)
+
+      // Hashing a multi-megabyte bundle happens off the main thread.
+      queues.io.async { [weak self] in
+        let check = BundleVerifier.verifyFile(bundleURL, expectedSha256: config.bundleSha256)
+        DispatchQueue.main.async {
+          guard let self, !self.detached else {
+            return reply.error(.engineDisposed("Plugin detached during boot"))
+          }
+          if case .failure(let error) = check { return reply.error(error) }
+          let runtime = NativeRuntime(
+            id: UUID().uuidString, config: config, bundleURL: bundleURL, queues: self.queues,
+            events: self)
+          self.registry.add(runtime)
+          runtime.boot { [weak self] error in
+            if let error {
+              self?.registry.remove(runtime.id)
+              runtime.dispose()
+              reply.error(error)
+            } else {
+              reply.success(["runtimeId": runtime.id])
+            }
+          }
+        }
+      }
+    #else
+      reply.error(
+        .unsupportedEngine(
+          "The react_native engine needs React Native in the host app: add "
+            + "pod 'flutter_react_embed_ios/ReactNative' to the Podfile next to use_react_native! "
+            + "(see the flutter_react_embed README, \"React Native engine\")"))
+    #endif
   }
 
   private func updateProps(arguments: [String: Any]?, reply: SingleReply) {
@@ -203,15 +250,15 @@ extension FlutterReactEmbedPlugin: RuntimeEvents {
 
 /// Owns live runtimes and the platform-view -> runtime binding. Main thread only.
 final class RuntimeRegistry {
-  private var runtimes: [String: WebRuntime] = [:]
+  private var runtimes: [String: EmbedRuntime] = [:]
   private var viewToRuntime: [Int64: String] = [:]
 
-  func add(_ runtime: WebRuntime) { runtimes[runtime.id] = runtime }
+  func add(_ runtime: EmbedRuntime) { runtimes[runtime.id] = runtime }
 
-  func runtime(_ id: String) -> WebRuntime? { runtimes[id] }
+  func runtime(_ id: String) -> EmbedRuntime? { runtimes[id] }
 
   @discardableResult
-  func remove(_ id: String) -> WebRuntime? {
+  func remove(_ id: String) -> EmbedRuntime? {
     viewToRuntime = viewToRuntime.filter { $0.value != id }
     return runtimes.removeValue(forKey: id)
   }
@@ -220,12 +267,12 @@ final class RuntimeRegistry {
 
   func unbind(viewId: Int64) { viewToRuntime.removeValue(forKey: viewId) }
 
-  func runtime(forView viewId: Int64) -> WebRuntime? {
+  func runtime(forView viewId: Int64) -> EmbedRuntime? {
     viewToRuntime[viewId].flatMap { runtimes[$0] }
   }
 
-  func runtimeRetaining(_ cacheKey: String) -> WebRuntime? {
-    runtimes.values.first { $0.retainedCacheKey == cacheKey }
+  func runtimes(retaining cacheKey: String) -> [EmbedRuntime] {
+    runtimes.values.filter { $0.retains(cacheKey) }
   }
 
   func disposeAll() {

@@ -1,8 +1,10 @@
 package dev.flutterreactembed
 
+import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.widget.FrameLayout
 import androidx.annotation.AnyThread
 import org.json.JSONObject
 import java.util.concurrent.ExecutorService
@@ -19,12 +21,20 @@ internal object Protocol {
     const val CONTROL_CHANNEL = "dev.flutter_react_embed/control"
     const val MESSAGE_CHANNEL = "dev.flutter_react_embed/messages"
     const val VIEW_TYPE_WEB = "dev.flutter_react_embed/view/web"
+    const val VIEW_TYPE_REACT_NATIVE = "dev.flutter_react_embed/view/react_native"
 
     const val ENGINE_WEB = "web"
     const val ENGINE_REACT_NATIVE = "react_native"
 
     /** Name of the JS object exposing `postMessage(frame)` to the page. */
     const val JS_OBJECT = "__freNative"
+
+    /** React Native module name (`NativeModules.FlutterReactEmbed`) and its event. */
+    const val RN_MODULE = "FlutterReactEmbed"
+    const val RN_FRAME_EVENT = "freFrame"
+
+    /** Initial-props key carrying `{runtimeId, viewId, contractVersion, platform, cacheKey}`. */
+    const val RN_META_PROP = "__fre"
 
     /** Origin every bundle is served from (intercepted, never hits the network). */
     const val ASSET_HOST = "appassets.androidplatform.net"
@@ -175,6 +185,36 @@ internal class EmbedThreads {
             Thread(runnable, "$prefix-${counter.incrementAndGet()}").apply { isDaemon = true }
         }
     }
+}
+
+/**
+ * One JavaScript runtime as seen by the plugin and its platform views.
+ * Implemented by [WebRuntime] and, when React Native is linked, NativeRuntime.
+ * Main thread only.
+ */
+internal interface EmbedRuntime {
+    val id: String
+
+    /** [Protocol.ENGINE_WEB] or [Protocol.ENGINE_REACT_NATIVE]. */
+    val engine: String
+
+    /** Whether a detached surface is retained under [cacheKey]. */
+    fun retains(cacheKey: String): Boolean
+
+    fun deliverFromDart(frame: String, onResult: (code: String?, message: String?) -> Unit)
+
+    /** Shows a surface for [params] in [container]. Returns an error message, or null. */
+    fun attach(viewId: Int, container: FrameLayout, hostContext: Context, params: SurfaceParams): String?
+
+    fun detach(viewId: Int, cacheKey: String?)
+
+    fun evictCached(cacheKey: String)
+
+    /** Returns an error code, or null. */
+    fun updateProps(viewId: Int, props: JSONObject): String?
+
+    /** Releases every resource. Idempotent. */
+    fun dispose()
 }
 
 /** Receives runtime output. Always invoked on the main thread. */

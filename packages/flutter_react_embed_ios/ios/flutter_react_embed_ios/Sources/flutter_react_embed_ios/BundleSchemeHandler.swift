@@ -8,14 +8,21 @@ enum BundleVerifier {
   /// set, that its SHA-256 matches. Pinning index.html pins the whole build,
   /// because it references content-hashed asset file names. Call off main.
   static func verify(root: URL, expectedSha256: String?) -> Result<Void, FREError> {
-    let index = root.appendingPathComponent("index.html")
-    guard let data = try? Data(contentsOf: index, options: .mappedIfSafe) else {
-      return .failure(.bundleNotFound(index.lastPathComponent))
+    verifyFile(root.appendingPathComponent("index.html"), expectedSha256: expectedSha256)
+  }
+
+  /// Checks that the single file `file` exists and, when `expectedSha256` is
+  /// set, that its SHA-256 matches. Used for React Native bundles
+  /// (`main.jsbundle`), which are one file. Call off main.
+  static func verifyFile(_ file: URL, expectedSha256: String?) -> Result<Void, FREError> {
+    guard let data = try? Data(contentsOf: file, options: .mappedIfSafe) else {
+      return .failure(.bundleNotFound(file.lastPathComponent))
     }
     guard let expected = expectedSha256 else { return .success(()) }
     let actual = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     return actual == expected
-      ? .success(()) : .failure(.bundleIntegrity(expected: expected, actual: actual))
+      ? .success(())
+      : .failure(.bundleIntegrity(expected: expected, actual: actual, file: file.lastPathComponent))
   }
 }
 

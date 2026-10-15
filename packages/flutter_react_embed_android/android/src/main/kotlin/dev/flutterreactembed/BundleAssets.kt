@@ -25,10 +25,18 @@ internal object BundleVerifier {
      * build, because it references content-hashed asset file names.
      */
     @WorkerThread
-    fun verify(assets: AssetManager, assetDir: String, expectedSha256: String?): BundleCheck {
-        val indexPath = "$assetDir/index.html"
+    fun verify(assets: AssetManager, assetDir: String, expectedSha256: String?): BundleCheck =
+        verifyFile(assets, "$assetDir/index.html", expectedSha256)
+
+    /**
+     * Verifies that the single asset [path] exists and, when [expectedSha256]
+     * is set, that its SHA-256 matches. Used for React Native bundles
+     * (`index.android.bundle`), which are one file.
+     */
+    @WorkerThread
+    fun verifyFile(assets: AssetManager, path: String, expectedSha256: String?): BundleCheck {
         return try {
-            assets.open(indexPath).use { stream ->
+            assets.open(path).use { stream ->
                 if (expectedSha256 == null) {
                     BundleCheck.Ok
                 } else {
@@ -37,7 +45,7 @@ internal object BundleVerifier {
                 }
             }
         } catch (_: FileNotFoundException) {
-            BundleCheck.NotFound(indexPath)
+            BundleCheck.NotFound(path)
         } catch (e: IOException) {
             BundleCheck.Unreadable(e.message ?: e.javaClass.simpleName)
         }

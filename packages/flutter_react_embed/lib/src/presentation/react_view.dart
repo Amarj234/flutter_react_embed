@@ -75,14 +75,81 @@ final class ReactViewConfiguration {
     this.hitTestBehavior = PlatformViewHitTestBehavior.opaque,
   });
 
+  /// Configures a React web build ([ReactEmbedType.web]).
+  ///
+  /// [assetPath] is the Flutter asset directory holding the build's
+  /// `index.html`. [route] is the initial route: `'/path'` for history routing,
+  /// `'#/path'` for hash routing.
+  factory ReactViewConfiguration.web({
+    required String assetPath,
+    String route = '/',
+    JsonMap initialProps = const <String, Object?>{},
+    String? bundleSha256,
+    String? cacheKey,
+    bool enableDebugging = false,
+    Duration requestTimeout = const Duration(seconds: 10),
+    AndroidCompositionMode androidComposition = AndroidCompositionMode.textureLayer,
+    PlatformViewHitTestBehavior hitTestBehavior = PlatformViewHitTestBehavior.opaque,
+  }) => ReactViewConfiguration(
+    engine: ReactEngineConfig(
+      engine: ReactEngineKind.web,
+      bundle: assetPath,
+      bundleSha256: bundleSha256,
+      enableDebugging: enableDebugging,
+      requestTimeout: requestTimeout,
+    ),
+    moduleName: route,
+    initialProps: initialProps,
+    cacheKey: cacheKey,
+    androidComposition: androidComposition,
+    hitTestBehavior: hitTestBehavior,
+  );
+
+  /// Configures a React Native app ([ReactEmbedType.native]).
+  ///
+  /// [bundleName] is the Flutter asset key of the compiled bundle
+  /// (`index.android.bundle`). On iOS [iosBundleName] is used instead when set
+  /// (`main.jsbundle`). [componentName] is the root component registered with
+  /// `AppRegistry.registerComponent`, which receives [initialProps].
+  ///
+  /// When the host app provides its own React Native host (a
+  /// `ReactApplication` on Android, a `FlutterReactEmbedReactNativeHost` on
+  /// iOS), that host's bundle is loaded and the bundle names are only checked
+  /// for existence.
+  factory ReactViewConfiguration.native({
+    required String bundleName,
+    String? iosBundleName,
+    required String componentName,
+    JsonMap initialProps = const <String, Object?>{},
+    String? bundleSha256,
+    String? cacheKey,
+    Duration requestTimeout = const Duration(seconds: 10),
+    AndroidCompositionMode androidComposition = AndroidCompositionMode.textureLayer,
+    PlatformViewHitTestBehavior hitTestBehavior = PlatformViewHitTestBehavior.opaque,
+  }) => ReactViewConfiguration(
+    engine: ReactEngineConfig(
+      engine: ReactEngineKind.reactNative,
+      bundle: defaultTargetPlatform == TargetPlatform.iOS ? iosBundleName ?? bundleName : bundleName,
+      bundleSha256: bundleSha256,
+      requestTimeout: requestTimeout,
+    ),
+    moduleName: componentName,
+    initialProps: initialProps,
+    cacheKey: cacheKey,
+    androidComposition: androidComposition,
+    hitTestBehavior: hitTestBehavior,
+  );
+
   /// Reads a configuration from loosely typed attributes, such as a remote
   /// micro-frontend manifest.
   ///
-  /// Recognised keys: `engine` (`react_native` | `web`), `bundle`,
-  /// `bundleSha256`, `moduleName`, `initialProps` (object), `cacheKey`,
-  /// `androidComposition` (`textureLayer` | `hybrid`), `requestTimeoutMs`,
-  /// `enableDebugging`. Throws [ReactConfigurationException] on a missing or
-  /// mistyped attribute instead of falling back silently.
+  /// Recognised keys: `engine` (`react_native` | `web`) or its alias `type`
+  /// (`native` | `web`), `bundle` (alias `bundleName`), `bundleSha256`,
+  /// `moduleName` (alias `componentName`), `initialProps` (object),
+  /// `cacheKey`, `androidComposition` (`textureLayer` | `hybrid`),
+  /// `requestTimeoutMs`, `enableDebugging`. Throws
+  /// [ReactConfigurationException] on a missing, mistyped or conflicting
+  /// attribute instead of falling back silently.
   factory ReactViewConfiguration.fromAttributes(Map<String, Object?> attributes) {
     T? read<T extends Object>(String key, {bool required = false}) {
       final Object? value = attributes[key];
@@ -112,25 +179,53 @@ final class ReactViewConfiguration {
       );
     }
 
-    read<String>('engine', required: true);
-    final ReactEngineKind engine = parseEnum<ReactEngineKind>(
-      'engine',
-      ReactEngineKind.values,
-      (ReactEngineKind e) => e.wireName,
-      ReactEngineKind.reactNative,
-    );
+    /// Reads [key] or its [alias]; setting both is ambiguous and rejected.
+    String? readAliased(String key, String alias, {bool required = false}) {
+      final String? primary = read<String>(key);
+      final String? secondary = read<String>(alias);
+      if (primary != null && secondary != null) {
+        throw ReactConfigurationException('Set either "$key" or "$alias", not both');
+      }
+      final String? value = primary ?? secondary;
+      if (value == null && required) {
+        throw ReactConfigurationException('Missing required attribute "$key" (or "$alias")');
+      }
+      return value;
+    }
+
+    final ReactEngineKind engine;
+    if (attributes.containsKey('type')) {
+      if (attributes.containsKey('engine')) {
+        throw const ReactConfigurationException('Set either "engine" or "type", not both');
+      }
+      read<String>('type', required: true);
+      engine = parseEnum<ReactEmbedType>(
+        'type',
+        ReactEmbedType.values,
+        (ReactEmbedType t) => t.name,
+        ReactEmbedType.web,
+      ).engine;
+    } else {
+      read<String>('engine', required: true);
+      engine = parseEnum<ReactEngineKind>(
+        'engine',
+        ReactEngineKind.values,
+        (ReactEngineKind e) => e.wireName,
+        ReactEngineKind.reactNative,
+      );
+    }
     final int? timeoutMs = read<int>('requestTimeoutMs');
     final Map<String, Object?>? props = read<Map<String, Object?>>('initialProps');
 
     final ReactViewConfiguration configuration = ReactViewConfiguration(
       engine: ReactEngineConfig(
         engine: engine,
-        bundle: read<String>('bundle', required: true)!,
+        bundle: readAliased('bundle', 'bundleName', required: true)!,
         bundleSha256: read<String>('bundleSha256'),
         enableDebugging: read<bool>('enableDebugging') ?? false,
         requestTimeout: timeoutMs == null ? const Duration(seconds: 10) : Duration(milliseconds: timeoutMs),
       ),
-      moduleName: read<String>('moduleName', required: true)!,
+      moduleName: readAliased('moduleName', 'componentName', required: true)!,
       initialProps: props ?? const <String, Object?>{},
       cacheKey: read<String>('cacheKey'),
       androidComposition: parseEnum<AndroidCompositionMode>(
@@ -147,6 +242,9 @@ final class ReactViewConfiguration {
 
   /// Runtime to boot when the view owns its runtime.
   final ReactEngineConfig engine;
+
+  /// Framework type of the embedded app, derived from [engine].
+  ReactEmbedType get type => engine.engine.embedType;
 
   /// React root component name (RN `AppRegistry` key) or SPA route.
   final String moduleName;
@@ -191,6 +289,25 @@ typedef ReactViewErrorBuilder = Widget Function(BuildContext context, ReactEmbed
 typedef ReactViewErrorCallback = void Function(ReactEmbedException error, StackTrace stackTrace);
 
 /// Embeds a React micro-frontend as a platform view.
+///
+/// One widget serves both framework types, selected by
+/// [ReactViewConfiguration.type]:
+///
+/// | [ReactEmbedType] | Native surface | Platform view type |
+/// | --- | --- | --- |
+/// | `web` | WebView / WKWebView | `dev.flutter_react_embed/view/web` |
+/// | `native` | React Native `ReactSurface` / root view | `dev.flutter_react_embed/view/react_native` |
+///
+/// ```dart
+/// ReactView(configuration: ReactViewConfiguration.web(assetPath: 'assets/react_app/'));
+/// ReactView(
+///   configuration: ReactViewConfiguration.native(
+///     bundleName: 'assets/rn/index.android.bundle',
+///     iosBundleName: 'assets/rn/main.jsbundle',
+///     componentName: 'Checkout',
+///   ),
+/// );
+/// ```
 ///
 /// The view resolves the execution environment, obtains a runtime (a shared
 /// [runtime], a retained surface from [surfaceCache], or a runtime it boots

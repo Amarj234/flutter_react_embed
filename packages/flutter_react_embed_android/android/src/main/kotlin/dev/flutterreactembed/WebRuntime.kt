@@ -58,18 +58,20 @@ import org.json.JSONObject
  */
 @SuppressLint("SetJavaScriptEnabled")
 internal class WebRuntime(
-    val id: String,
+    override val id: String,
     private val config: RuntimeConfig,
     private val appContext: Context,
     private val assetDir: String,
     private val threads: EmbedThreads,
     private val events: RuntimeEvents,
-) {
+) : EmbedRuntime {
     private enum class Phase { CREATED, BOOTING, READY, CRASHED, DISPOSED }
 
     private val contextWrapper = MutableContextWrapper(appContext)
     private val useMessageListener = WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)
     private val useDocumentStartScript = WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
+
+    override val engine: String = Protocol.ENGINE_WEB
 
     private var phase = Phase.CREATED
     private var webView: WebView? = null
@@ -91,6 +93,8 @@ internal class WebRuntime(
     /** Cache key under which JS keeps the React tree mounted while detached. */
     var retainedCacheKey: String? = null
         private set
+
+    override fun retains(cacheKey: String): Boolean = retainedCacheKey == cacheKey
 
     // -------------------------------------------------------------------------
     // Boot
@@ -235,7 +239,7 @@ internal class WebRuntime(
 
     /** Validates [frame] off the main thread, then queues or posts it. */
     @MainThread
-    fun deliverFromDart(frame: String, onResult: (code: String?, message: String?) -> Unit) {
+    override fun deliverFromDart(frame: String, onResult: (code: String?, message: String?) -> Unit) {
         threads.onBridge {
             val bytes = utf8Length(frame)
             threads.onMain {
@@ -284,7 +288,7 @@ internal class WebRuntime(
      * Returns an error message, or null on success.
      */
     @MainThread
-    fun attach(viewId: Int, container: FrameLayout, hostContext: Context, params: SurfaceParams): String? {
+    override fun attach(viewId: Int, container: FrameLayout, hostContext: Context, params: SurfaceParams): String? {
         val view = webView ?: return "Runtime $id is not available (${phase.name.lowercase()})"
         val current = attachedViewId
         if (current != null && current != viewId) {
@@ -324,7 +328,7 @@ internal class WebRuntime(
      * otherwise it is unmounted.
      */
     @MainThread
-    fun detach(viewId: Int, cacheKey: String?) {
+    override fun detach(viewId: Int, cacheKey: String?) {
         if (attachedViewId != viewId) return
         attachedViewId = null
         webView?.let { view ->
@@ -340,7 +344,7 @@ internal class WebRuntime(
 
     /** Drops the retained React tree for [cacheKey] if it is not on screen. */
     @MainThread
-    fun evictCached(cacheKey: String) {
+    override fun evictCached(cacheKey: String) {
         if (retainedCacheKey != cacheKey || attachedViewId != null) return
         retainedCacheKey = null
         postToJs(Protocol.notification("\$/unmount", JSONObject().put("cacheKey", cacheKey)))
@@ -348,7 +352,7 @@ internal class WebRuntime(
 
     /** Sends new props for [viewId]. Returns an error code, or null. */
     @MainThread
-    fun updateProps(viewId: Int, props: JSONObject): String? {
+    override fun updateProps(viewId: Int, props: JSONObject): String? {
         if (attachedViewId != viewId) return Protocol.E_UNKNOWN_VIEW
         return postToJs(Protocol.notification("\$/updateProps", JSONObject().put("viewId", viewId).put("props", props)))
     }
@@ -381,7 +385,7 @@ internal class WebRuntime(
 
     /** Releases every resource. Idempotent. */
     @MainThread
-    fun dispose() {
+    override fun dispose() {
         if (disposed) return
         disposed = true
         failBoot(Protocol.E_ENGINE_DISPOSED, "Runtime $id was disposed during boot")

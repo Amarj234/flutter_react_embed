@@ -41,10 +41,11 @@ private final class WeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
 /// - host -> JS: `window.__freReceive(frameString)`, which JS must define
 ///   before posting its first frame. The first frame is the readiness signal.
 /// - Host lifecycle notifications: `$/mount`, `$/updateProps`, `$/unmount`.
-final class WebRuntime: NSObject {
+final class WebRuntime: NSObject, EmbedRuntime {
   private enum Phase { case created, booting, ready, crashed, disposed }
 
   let id: String
+  let engine = FREProtocol.engineWeb
   private let config: RuntimeConfig
   private let bundleRoot: URL
   private let queues: EmbedQueues
@@ -60,6 +61,8 @@ final class WebRuntime: NSObject {
   private(set) var attachedViewId: Int64?
   /// Cache key under which JS keeps the React tree mounted while detached.
   private(set) var retainedCacheKey: String?
+
+  func retains(_ cacheKey: String) -> Bool { retainedCacheKey == cacheKey }
 
   init(id: String, config: RuntimeConfig, bundleRoot: URL, queues: EmbedQueues, events: RuntimeEvents) {
     self.id = id

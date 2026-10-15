@@ -21,22 +21,23 @@ Already have a React dashboard, checkout flow or admin page? Put it inside your 
 5. [Talking between Dart and React](#talking-between-dart-and-react)
 6. [Using the bridge from React components](#using-the-bridge-from-react-components)
 7. [Common recipes](#common-recipes)
-8. [Debugging](#debugging)
-9. [Troubleshooting](#troubleshooting)
-10. [FAQ](#faq)
-11. [How it works](#how-it-works)
-12. [API reference](#api-reference)
-13. [JavaScript contract](#javascript-contract)
-14. [Example app](#example-app)
-15. [Limitations](#limitations)
-16. [Author](#author)
-17. [License](#license)
+8. [React Native engine](#react-native-engine)
+9. [Debugging](#debugging)
+10. [Troubleshooting](#troubleshooting)
+11. [FAQ](#faq)
+12. [How it works](#how-it-works)
+13. [API reference](#api-reference)
+14. [JavaScript contract](#javascript-contract)
+15. [Example app](#example-app)
+16. [Limitations](#limitations)
+17. [Author](#author)
+18. [License](#license)
 
 ---
 
 ## What can it do?
 
-- **`ReactView` widget**: shows your React app like any other Flutter widget.
+- **`ReactView` widget**: shows your React app like any other Flutter widget. One widget handles both React web builds (`ReactEmbedType.web`) and React Native apps (`ReactEmbedType.native`).
 - **Dart → JavaScript calls**: call a JavaScript function from Dart and `await` its result.
 - **JavaScript → Dart calls**: call a Dart function from JavaScript and get its result back.
 - **Events**: send events from React to Flutter (for example "user clicked buy"), and from Flutter to React.
@@ -52,6 +53,8 @@ Already have a React dashboard, checkout flow or admin page? Put it inside your 
 | --- | --- | --- |
 | Android | Android System WebView (API 24+) | ✅ Supported |
 | iOS | WKWebView (iOS 15+) | ✅ Supported |
+| Android | React Native 0.82+ (New Architecture), opt-in | ✅ Supported since 1.1.0 |
+| iOS | React Native 0.82+ (New Architecture), opt-in | ✅ Supported since 1.1.0 |
 | Web, macOS, Windows, Linux | - | ❌ Not supported yet |
 
 Requires **Flutter 3.47 or later**.
@@ -696,6 +699,189 @@ See the [full list of errors](#errors).
 
 ---
 
+## React Native engine
+
+Since 1.1.0, `ReactView` can also show screens from a React Native app. Pick the framework with the configuration's type:
+
+```dart
+// React web build (unchanged from 1.0)
+ReactView(configuration: ReactViewConfiguration.web(assetPath: 'assets/react_app/'));
+
+// React Native app
+ReactView(
+  configuration: ReactViewConfiguration.native(
+    bundleName: 'assets/rn/index.android.bundle', // Android
+    iosBundleName: 'assets/rn/main.jsbundle',     // iOS
+    componentName: 'Checkout',                    // AppRegistry.registerComponent name
+    initialProps: {'total': 42},
+  ),
+);
+```
+
+`ReactViewConfiguration.web(...)` and `ReactViewConfiguration.native(...)` only build a `ReactViewConfiguration`. The existing constructor with `ReactEngineKind.web` / `ReactEngineKind.reactNative` still works, and `ReactEmbedType.web` / `ReactEmbedType.native` map one to one onto those engines.
+
+React Native is **opt-in**. Web-only apps do not change and do not ship any React Native code. To enable it, your Flutter app must already build React Native (New Architecture, 0.82 or later) and then:
+
+### 1. Build the bundles into Flutter assets
+
+```sh
+npx react-native bundle --platform android --dev false --entry-file index.js \
+  --bundle-output ../my_flutter_app/assets/rn/index.android.bundle
+npx react-native bundle --platform ios --dev false --entry-file index.js \
+  --bundle-output ../my_flutter_app/assets/rn/main.jsbundle
+```
+
+```yaml
+flutter:
+  assets:
+    - assets/rn/
+```
+
+### 2. Android
+
+Your Android app must apply React Native's Gradle plugin. Adding the `react-android` library alone is **not enough**: the Gradle plugin builds `libappmodules.so`, which registers React Native's core modules. Without it, every bundle crashes on load. The plugin detects this and fails with `UNSUPPORTED_ENGINE` instead.
+
+The setup below is the one the example app uses and is tested on Android (`example/tool/run_local_test.sh`). The example applies it only when `FRE_REACT_NATIVE=1`; your app applies it always. It assumes `package.json` and `node_modules` sit in your Flutter app's root, next to `android/`.
+
+**`react-native.config.js`** (next to `package.json`). This tells the React Native CLI where your Android app is:
+
+```js
+module.exports = {
+  project: {
+    android: { sourceDir: './android', packageName: 'com.example.myapp' }, // your app's namespace
+  },
+};
+```
+
+**`android/settings.gradle.kts`**, after `include(":app")`. This does what React Native's settings plugin does. That plugin can't be used as-is in a Flutter app: Flutter moves the root build directory to `../build`, and the React Native app plugin reads `autolinking.json` from there.
+
+```kotlin
+includeBuild("../node_modules/@react-native/gradle-plugin")
+
+val autolinkingConfig = providers.exec {
+    commandLine("npx", "@react-native-community/cli", "config")
+    workingDir = file("..")
+}.standardOutput.asText.get()
+file("../build/generated/autolinking/autolinking.json").apply {
+    parentFile.mkdirs()
+    writeText(autolinkingConfig)
+}
+
+// Include autolinked native libraries (same naming as React Native's settings plugin).
+@Suppress("UNCHECKED_CAST")
+val dependencies = (groovy.json.JsonSlurper().parseText(autolinkingConfig) as Map<String, Any?>)["dependencies"]
+    as Map<String, Map<String, Any?>>? ?: emptyMap()
+for ((name, dependency) in dependencies) {
+    @Suppress("UNCHECKED_CAST")
+    val android = (dependency["platforms"] as Map<String, Any?>?)?.get("android") as Map<String, Any?>?
+    val sourceDir = android?.get("sourceDir") as String? ?: continue
+    if (android["isPureCxxDependency"] == true) continue
+    val path = ":" + name.replace(Regex("[~*!'()]+"), "_").replace(Regex("^@([\\w-.]+)/"), "$1_")
+    include(path)
+    project(path).projectDir = file(sourceDir)
+}
+```
+
+**`android/build.gradle.kts`**, at the top:
+
+```kotlin
+buildscript {
+    repositories { google(); mavenCentral(); gradlePluginPortal() }
+    dependencies { classpath("com.facebook.react:react-native-gradle-plugin") }
+}
+```
+
+**`android/app/build.gradle.kts`**, at the end:
+
+```kotlin
+apply(plugin = "com.facebook.react")
+val react = extensions.getByName("react")
+fun <T : Any> reactProperty(name: String): T {
+    @Suppress("UNCHECKED_CAST")
+    return react.withGroovyBuilder { getProperty(name) } as T
+}
+reactProperty<DirectoryProperty>("root").set(rootProject.file(".."))
+// The bundle ships as a Flutter asset, so React Native never bundles it itself.
+reactProperty<ListProperty<String>>("debuggableVariants").set(listOf("debug", "profile", "release"))
+react.withGroovyBuilder { "autolinkLibrariesWithApp"() }
+
+dependencies {
+    "implementation"("com.facebook.react:react-android") // version pinned by the plugin
+    "implementation"("com.facebook.react:hermes-android")
+}
+```
+
+**`android/gradle.properties`**:
+
+```properties
+newArchEnabled=true
+hermesEnabled=true
+# Flutter already pins Java 17; React Native's toolchain alignment fails under AGP 9.
+react.internal.disableJavaVersionAlignment=true
+```
+
+The plugin creates one `ReactHost` the first time it is needed, using the entry point and `PackageList` that React Native's Gradle plugin generates. It loads `bundleName` from the Flutter assets and forwards the Activity's resume, pause and destroy to the host.
+
+If your `Application` already implements `ReactApplication`, the plugin uses **your** `reactHost` and its bundle. Add the bridge package to its package list:
+
+```kotlin
+override val reactHost: ReactHost by lazy {
+    getDefaultReactHost(applicationContext, PackageList(this).packages + FlutterReactEmbedPackage())
+}
+```
+
+### 3. iOS
+
+In `ios/Podfile`, add React Native and the plugin's `ReactNative` subspec to the `Runner` target:
+
+```ruby
+require_relative '../node_modules/react-native/scripts/react_native_pods'
+
+target 'Runner' do
+  use_frameworks! :linkage => :static
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  use_react_native!(:path => '../node_modules/react-native')
+  pod 'flutter_react_embed_ios/ReactNative', :path => '.symlinks/plugins/flutter_react_embed_ios/ios'
+end
+```
+
+The plugin creates one `RCTReactNativeFactory` that loads `iosBundleName` from the Flutter assets. To use your own factory instead, call this before the first native `ReactView` mounts:
+
+```swift
+import flutter_react_embed_ios
+
+FlutterReactEmbedReactNativeHost.use(myFactory)
+```
+
+The React Native engine needs CocoaPods. Swift Package Manager builds of the plugin include the web engine only.
+
+### 4. Connect your React Native components
+
+Copy [`example/tool/fre-bridge-native.js`](https://github.com/Amarj234/flutter_react_embed/blob/main/packages/flutter_react_embed/example/tool/fre-bridge-native.js) into your React Native project:
+
+```jsx
+import { useFlutterBridge } from './fre-bridge-native';
+
+export default function Checkout(props) {
+  const bridge = useFlutterBridge(props.__fre, {
+    getTotal: () => ({ total: props.total }),            // Dart: controller.invoke('getTotal')
+  });
+  return <Button title="Pay" onPress={() => bridge.emit('paid', { total: props.total })} />;
+}
+AppRegistry.registerComponent('Checkout', () => Checkout);
+```
+
+`invoke`, `emit`, `events`, `registerHandler` and `updateProps` on `ReactViewController` work the same way as with the web engine. Props updates re-render the root component natively; your code doesn't need to handle them.
+
+### How it differs from the web engine
+
+- All React Native runtimes share one JavaScript instance (one bundle per app process). They are kept apart by `props.__fre.runtimeId`.
+- One runtime can show **several** views at once.
+- The React Native host stays loaded after its last view closes, because starting it again costs more than keeping it. Views, retained surfaces and Activity references are released.
+- On iOS, fatal JavaScript errors are handled by React Native itself (red box in debug builds) and are not reported to Dart. On Android they are reported to Dart when the plugin created the host.
+
+---
+
 ## Debugging
 
 Turn on the browser developer tools for the WebView:
@@ -754,7 +940,7 @@ Not currently. Bundles are loaded from Flutter assets, which makes them fast, of
 Yes, as long as each one has its own runtime (the default). One runtime can only be shown in one view at a time.
 
 **Does it support React Native?**
-Not yet. `ReactEngineKind.reactNative` is reserved for a future release; using it today fails with `UNSUPPORTED_ENGINE`.
+Yes, since 1.1.0. It's opt-in; see [React Native engine](#react-native-engine). If the app doesn't include React Native, a native configuration fails with `UNSUPPORTED_ENGINE` and a message that explains what to add.
 
 **Is `localStorage` supported?**
 Yes. On Android, all bundles share the same origin, so they also share `localStorage`.
@@ -823,15 +1009,19 @@ Dart is **not** compiled to JavaScript. Dart and JavaScript run separately and s
 | `androidComposition` | `AndroidCompositionMode` | `textureLayer` | Use `hybrid` if your page has video or other `SurfaceView` content. |
 | `hitTestBehavior` | `PlatformViewHitTestBehavior` | `opaque` | Hit testing of the platform view. |
 
-`ReactViewConfiguration.fromAttributes(Map<String, Object?>)` builds a configuration from JSON-like data. It throws `ReactConfigurationException` on any missing or mistyped field.
+| `type` (getter) | `ReactEmbedType` | - | `web` or `native`, derived from `engine`. |
+
+Shortcuts: `ReactViewConfiguration.web(assetPath:, route:, ...)` and `ReactViewConfiguration.native(bundleName:, iosBundleName:, componentName:, initialProps:, ...)`.
+
+`ReactViewConfiguration.fromAttributes(Map<String, Object?>)` builds a configuration from JSON-like data. Besides `engine`, `bundle` and `moduleName`, it accepts `type` (`web` | `native`), `bundleName` and `componentName`. It throws `ReactConfigurationException` on any missing, mistyped or conflicting field.
 
 ### `ReactEngineConfig`
 
 | Property | Type | Default | Description |
 | --- | --- | --- | --- |
-| `engine` | `ReactEngineKind` | Required | `ReactEngineKind.web`. |
-| `bundle` | `String` | Required | Flutter asset folder that contains `index.html`. |
-| `bundleSha256` | `String?` | `null` | Expected SHA-256 of `index.html`; loading fails with `BUNDLE_INTEGRITY` if it differs. |
+| `engine` | `ReactEngineKind` | Required | `ReactEngineKind.web` or `ReactEngineKind.reactNative`. |
+| `bundle` | `String` | Required | Web: Flutter asset folder that contains `index.html`. React Native: the bundle file (`index.android.bundle` / `main.jsbundle`). |
+| `bundleSha256` | `String?` | `null` | Expected SHA-256 of `index.html` (web) or of the bundle file (React Native); loading fails with `BUNDLE_INTEGRITY` if it differs. |
 | `requestTimeout` | `Duration` | 10 s | Default time limit for Dart → JavaScript calls. |
 | `maxMessageBytes` | `int` | 1 MiB | Largest accepted message, in UTF-8 bytes. |
 | `enableDebugging` | `bool` | `false` | Enables Chrome DevTools / Safari Web Inspector. |
@@ -900,6 +1090,16 @@ You only need this if you write your own bridge instead of the `bridge.js` above
 
 Messages sent by Dart before the page's first message are queued and delivered once it arrives.
 
+For the React Native engine:
+
+| API or message | Direction | Purpose |
+| --- | --- | --- |
+| `props.__fre` | Host → JS | `{runtimeId, viewId, contractVersion, platform, cacheKey}` on every root component. |
+| `NativeModules.FlutterReactEmbed.postMessage(runtimeId, frame)` | JS → host | Sends a JSON-RPC message (as a string). |
+| `freFrame` event on `new NativeEventEmitter(NativeModules.FlutterReactEmbed)` | Host → JS | `{runtimeId, frame}`; ignore frames for other runtime ids. |
+
+The first message JavaScript sends for a runtime marks it ready. Dart's messages are queued until then, and again after a JavaScript reload.
+
 ---
 
 ## Example app
@@ -917,7 +1117,8 @@ flutter run
 
 ## Limitations
 
-- One runtime can be shown in only one view at a time; attaching a second view to the same runtime is reported as an error.
+- A web runtime can be shown in only one view at a time; attaching a second view to the same runtime is reported as an error. React Native runtimes can show several views.
+- One React Native bundle per app process (React Native runs one JavaScript instance).
 - On Android, all bundles are served from the same origin, so they share `localStorage`.
 - On iOS, the page origin is `fre-app://bundle`; remote APIs must allow it in their CORS policy.
 - Web and desktop platforms are not supported yet.

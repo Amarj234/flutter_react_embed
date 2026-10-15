@@ -18,3 +18,6 @@ Pods/
 .symlinks/
 xcuserdata/
 DerivedData/
+
+# Release tooling output (tool/release_preflight.sh)
+.release_preflight/

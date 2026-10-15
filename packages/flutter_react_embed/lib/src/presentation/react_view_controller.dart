@@ -9,11 +9,7 @@ import 'package:flutter_react_embed_platform_interface/flutter_react_embed_platf
 /// [ReactRuntimeDisposedException].
 final class ReactViewController {
   /// Creates a controller. Called by `ReactView`; not part of the stable API.
-  ReactViewController.internal({
-    required this.runtime,
-    required this.viewId,
-    required this._platform,
-  });
+  ReactViewController.internal({required this.runtime, required this.viewId, required this._platform});
 
   /// Runtime rendering this view.
   final ReactRuntimeHandle runtime;

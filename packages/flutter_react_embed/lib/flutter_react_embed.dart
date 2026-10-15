@@ -1,6 +1,7 @@
 /// Embed React Native surfaces and production React SPAs inside Flutter.
 ///
-/// Start with [ReactView]; share runtimes across views with
+/// Start with [ReactView] and a [ReactViewConfiguration.web] or
+/// [ReactViewConfiguration.native] configuration; share runtimes across views with
 /// [FlutterReactEmbedPlatform.initializeEngine].
 library;
 
@@ -12,6 +13,7 @@ export 'package:flutter_react_embed_platform_interface/flutter_react_embed_platf
         ReactBridgeEvent,
         ReactConfigurationException,
         ReactEmbedException,
+        ReactEmbedType,
         ReactEngineConfig,
         ReactEngineInitializationException,
         ReactEngineKind,

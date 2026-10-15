@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0
+
+- Added `ReactEmbedType { web, native }`, mapped one to one onto `ReactEngineKind`, and `ReactEngineKind.embedType`.
+- `ReactEngineConfig.bundle` documents the React Native bundle file (`index.android.bundle` / `main.jsbundle`).
+- No changes to the wire protocol or to `FlutterReactEmbedPlatform`.
+
 ## 1.0.0
 
 Initial release.
