@@ -2,6 +2,13 @@
 
 All notable changes to this package are documented here. This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.1.1
+
+- Requires `flutter_react_embed_ios` 1.1.1, which fixes compiling the iOS React Native subspec.
+- React Native components can now call Dart: `fre-bridge-native.js` adds `bridge.call(method, params, timeoutMs)`, answered by handlers registered with `ReactViewController.registerHandler`.
+- README: the iOS setup now lists everything React Native needs in a Flutter app: iOS 15.1, the full Podfile (`use_native_modules!`, `use_react_native!`, `react_native_post_install`), and `ios.sourceDir` in `react-native.config.js`.
+- Verified on Android (API 37 emulator) and iOS (iOS 26.5 simulator) with a Flutter app that shows a React web dashboard and a React Native screen. Integration tests cover calls and events in both directions and props updates on each.
+
 ## 1.1.0
 
 Adds a React Native engine next to the React Web engine. No breaking changes: 1.0 code, the web engine and its JavaScript contract work unchanged.

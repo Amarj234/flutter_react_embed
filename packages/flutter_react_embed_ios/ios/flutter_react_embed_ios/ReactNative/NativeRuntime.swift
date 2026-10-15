@@ -384,7 +384,8 @@ final class FlutterReactEmbedModule: RCTEventEmitter {
     return observing
   }
 
-  @objc static func requiresMainQueueSetup() -> Bool { false }
+  /// RCTEventEmitter implements this; no main-queue setup is needed.
+  override static func requiresMainQueueSetup() -> Bool { false }
 
   override func supportedEvents() -> [String]! { [FREProtocol.rnFrameEvent] }
 

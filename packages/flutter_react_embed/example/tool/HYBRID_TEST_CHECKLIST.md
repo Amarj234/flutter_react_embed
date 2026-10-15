@@ -16,7 +16,7 @@ A release candidate needs every row to pass.
 | # | Gate | Stage | Pass condition |
 | --- | --- | --- | --- |
 | A1 | `flutter pub get` in the workspace root and each of the 5 packages | pub-get | All resolve |
-| A2 | Release manifests | pub-get | All 4 pubspecs and the podspec are `1.1.0`; internal constraints `^1.1.0`; every CHANGELOG has `## 1.1.0` |
+| A2 | Release manifests | pub-get | Every package has a CHANGELOG entry for its own version; `flutter_react_embed` depends on each sibling at `^<its version>`; the podspec matches `flutter_react_embed_ios` |
 | A3 | Static analysis | pub-get | `flutter analyze packages` is clean |
 | A4 | Probe bundle | bundle | `assets/rn/index.android.bundle` exists and contains `FreProbe` and the bridge (`freFrame`) |
 | A5 | Web contract | test | `add`, `echo`, `throwError`, `ping`→`pong`, `propsApplied` pass on the WebView |

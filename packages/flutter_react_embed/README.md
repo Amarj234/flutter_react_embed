@@ -54,7 +54,7 @@ Already have a React dashboard, checkout flow or admin page? Put it inside your 
 | Android | Android System WebView (API 24+) | ✅ Supported |
 | iOS | WKWebView (iOS 15+) | ✅ Supported |
 | Android | React Native 0.82+ (New Architecture), opt-in | ✅ Supported since 1.1.0 |
-| iOS | React Native 0.82+ (New Architecture), opt-in | ✅ Supported since 1.1.0 |
+| iOS | React Native 0.82+ (New Architecture), opt-in | ✅ Supported since 1.1.1 |
 | Web, macOS, Windows, Linux | - | ❌ Not supported yet |
 
 Requires **Flutter 3.47 or later**.
@@ -832,18 +832,47 @@ override val reactHost: ReactHost by lazy {
 
 ### 3. iOS
 
-In `ios/Podfile`, add React Native and the plugin's `ReactNative` subspec to the `Runner` target:
+React Native 0.87 needs iOS 15.1 or later. Set **Minimum Deployments** of the `Runner` target to 15.1 in Xcode (`IPHONEOS_DEPLOYMENT_TARGET = 15.1`).
+
+In `ios/Podfile`, combine Flutter's setup with React Native's and add the plugin's `ReactNative` subspec. These are the parts to add to Flutter's generated Podfile:
 
 ```ruby
-require_relative '../node_modules/react-native/scripts/react_native_pods'
+# At the top: resolve react_native_pods.rb with node.
+require Pod::Executable.execute_command('node', ['-p',
+  'require.resolve(
+    "react-native/scripts/react_native_pods.rb",
+    {paths: [process.argv[1]]},
+  )', __dir__]).strip
+
+platform :ios, min_ios_version_supported
+prepare_react_native_project!
+
+# ...Flutter's generated flutter_root / podhelper / flutter_ios_podfile_setup...
 
 target 'Runner' do
   use_frameworks! :linkage => :static
+  config = use_native_modules!
+
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-  use_react_native!(:path => '../node_modules/react-native')
+
+  use_react_native!(
+    :path => config[:reactNativePath],
+    :app_path => "#{Pod::Config.instance.installation_root}/.."
+  )
   pod 'flutter_react_embed_ios/ReactNative', :path => '.symlinks/plugins/flutter_react_embed_ios/ios'
+
+  # ...Flutter's RunnerTests target...
+end
+
+post_install do |installer|
+  react_native_post_install(installer, '../node_modules/react-native', :mac_catalyst_enabled => false)
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+  end
 end
 ```
+
+Next to `package.json`, `react-native.config.js` also needs `ios: { sourceDir: './ios' }` under `project`.
 
 The plugin creates one `RCTReactNativeFactory` that loads `iosBundleName` from the Flutter assets. To use your own factory instead, call this before the first native `ReactView` mounts:
 
@@ -871,7 +900,7 @@ export default function Checkout(props) {
 AppRegistry.registerComponent('Checkout', () => Checkout);
 ```
 
-`invoke`, `emit`, `events`, `registerHandler` and `updateProps` on `ReactViewController` work the same way as with the web engine. Props updates re-render the root component natively; your code doesn't need to handle them.
+`invoke`, `emit`, `events`, `registerHandler` and `updateProps` on `ReactViewController` work the same way as with the web engine. From React Native, call a Dart handler registered with `registerHandler` with `await bridge.call('method', params)`. Props updates re-render the root component natively; your code doesn't need to handle them.
 
 ### How it differs from the web engine
 

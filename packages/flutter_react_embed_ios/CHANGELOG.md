@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1
+
+- Fixed: the `flutter_react_embed_ios/ReactNative` subspec did not compile. `FlutterReactEmbedModule.requiresMainQueueSetup()` was missing `override`, which React Native's `RCTEventEmitter` requires.
+- Verified: React Native 0.87.1 (prebuilt core, New Architecture) runs on the iOS 26.5 simulator in a Flutter app. Calls, events and props updates work in both directions.
+
 ## 1.1.0
 
 - **React Native engine** (`react_native`) in the opt-in `flutter_react_embed_ios/ReactNative` CocoaPods subspec. The default `Core` subspec, which Flutter installs, is the unchanged WKWebView engine.

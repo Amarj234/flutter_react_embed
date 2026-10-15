@@ -2,18 +2,24 @@
 #
 # Commits, pushes and publishes the flutter_react_embed package suite.
 #
-#   tool/release_publish.sh [--dry-run] [--version X.Y.Z]
+#   tool/release_publish.sh [--dry-run] [--yes] [--version X.Y.Z]
+#
+# Releases every package whose pubspec is at --version; the others must
+# already be on pub.dev at their own pubspec version (a patch release can
+# ship only the packages that changed).
 #
 # Steps (each irreversible step asks for confirmation):
 #   1. Preconditions: on main, in sync with origin, pub credentials present,
-#      every pubspec at the release version.
+#      released packages have a CHANGELOG entry, flutter_react_embed depends
+#      on each sibling at ^<its pubspec version>, the podspec matches the iOS
+#      pubspec, and unreleased packages are already on pub.dev.
 #   2. Commit the release (skipped if the tree is already clean).
 #   3. Gate: tool/release_preflight.sh on the committed tree must report
 #      zero failures and zero warnings (dry-runs included).
 #   4. Push main to origin.
 #   5. Publish in dependency order with `flutter pub publish` (interactive).
-#      flutter_react_embed depends on the other three at ^VERSION, so it goes
-#      last, and only once pub.dev serves all three at VERSION.
+#      flutter_react_embed depends on the other three, so it goes last, and
+#      only once pub.dev serves each of them at its pubspec version.
 #   6. Tag each published package (<package>-v<VERSION>) and push the tags.
 #
 # Re-runnable: packages already on pub.dev at VERSION are skipped, so after a
@@ -21,12 +27,15 @@
 #
 # --dry-run  run every check and show what would happen; change nothing
 #            (no commit, push, publish or tag).
+# --yes      answer yes to every confirmation and run `flutter pub publish
+#            --force`. For an already approved release only.
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="1.1.0"
 DRY_RUN=0
+ASSUME_YES=0
 BRANCH="main"
 REMOTE="origin"
 PUB_CREDENTIALS="$HOME/Library/Application Support/dart/pub-credentials.json"
@@ -46,23 +55,31 @@ FORBIDDEN_IN_COMMIT='(^|/)(node_modules|\.rn_mock|\.fre_test_logs|\.release_pref
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run) DRY_RUN=1 ;;
+    --yes) ASSUME_YES=1 ;;
     --version) VERSION="${2:?--version needs X.Y.Z}"; shift ;;
-    -h | --help) sed -n '2,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h | --help) sed -n '2,33p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
   shift
 done
 
-COMMIT_MESSAGE="Release flutter_react_embed $VERSION: React Native engine alongside React Web
+changelog_entry() {
+  # changelog_entry PACKAGE: the body of its "## VERSION" CHANGELOG section.
+  awk -v heading="## $VERSION" '
+    $0 == heading { found = 1; next }
+    found && /^## / { exit }
+    found { print }
+  ' "packages/$1/CHANGELOG.md" | sed '/./,$!d'
+}
 
-- ReactEmbedType { web, native } and ReactViewConfiguration.web()/.native()
-- Android: NativeRuntime on a shared ReactHost (react-android compileOnly),
-  libappmodules.so guard, Activity lifecycle forwarding
-- iOS: opt-in ReactNative CocoaPods subspec over RCTReactNativeFactory
-- Example: opt-in React Native Gradle plugin setup, hybrid switching harness,
-  integration test and tool/run_local_test.sh
-- tool/release_preflight.sh and tool/release_publish.sh
-- All four packages bumped to $VERSION with CHANGELOG entries"
+commit_message() {
+  # Subject plus each released package's CHANGELOG entry.
+  local package
+  printf 'Release flutter_react_embed %s (%s)\n' "$VERSION" "${RELEASE[*]}"
+  for package in "${RELEASE[@]}"; do
+    printf '\n%s %s:\n%s\n' "$package" "$VERSION" "$(changelog_entry "$package")"
+  done
+}
 
 step() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 ok() { printf '\033[1;32m  ✓\033[0m %s\n' "$*"; }
@@ -76,24 +93,35 @@ confirm() {
     note "dry run: would ask \"$1\""
     return 1
   fi
+  if ((ASSUME_YES)); then
+    note "$1 yes (--yes)"
+    return 0
+  fi
   read -r -p "$(printf '\033[1;35m  ?\033[0m %s [type yes] ' "$1")" answer
   [[ "$answer" == "yes" ]]
 }
 
+pubspec_version() {
+  sed -n 's/^version: *//p' "packages/$1/pubspec.yaml"
+}
+
 on_pub_dev() {
-  # on_pub_dev PACKAGE: true if pub.dev serves PACKAGE at VERSION.
+  # on_pub_dev PACKAGE [VERSION]: true if pub.dev serves PACKAGE at VERSION
+  # (default: the package's pubspec version).
+  local version="${2:-$(pubspec_version "$1")}"
   curl -fsS --max-time 20 "https://pub.dev/api/packages/$1" 2>/dev/null \
-    | grep -q "\"version\":\"$VERSION\""
+    | grep -q "\"version\":\"$version\""
 }
 
 wait_for_pub_dev() {
-  # wait_for_pub_dev PACKAGE: poll until pub.dev serves VERSION.
-  local waited=0
-  until on_pub_dev "$1"; do
-    ((waited < PROPAGATION_TIMEOUT_S)) || die "$1 $VERSION is not visible on pub.dev after ${PROPAGATION_TIMEOUT_S} s; re-run this script later"
+  # wait_for_pub_dev PACKAGE: poll until pub.dev serves its pubspec version.
+  local waited=0 version
+  version="$(pubspec_version "$1")"
+  until on_pub_dev "$1" "$version"; do
+    ((waited < PROPAGATION_TIMEOUT_S)) || die "$1 $version is not visible on pub.dev after ${PROPAGATION_TIMEOUT_S} s; re-run this script later"
     sleep 15
     waited=$((waited + 15))
-    printf '    waiting for pub.dev to list %s %s (%ss)\n' "$1" "$VERSION" "$waited"
+    printf '    waiting for pub.dev to list %s %s (%ss)\n' "$1" "$version" "$waited"
   done
 }
 
@@ -113,20 +141,31 @@ ok "on $BRANCH, not behind $REMOTE/$BRANCH"
 [[ -f "$PUB_CREDENTIALS" ]] || die "no pub.dev credentials; run: dart pub login"
 ok "pub.dev credentials present"
 
+RELEASE=()
 for package in "${PUBLISH_ORDER[@]}"; do
-  pubspec="packages/$package/pubspec.yaml"
-  [[ "$(sed -n 's/^version: *//p' "$pubspec")" == "$VERSION" ]] || die "$pubspec is not at $VERSION"
-  grep -q "^## $VERSION\$" "packages/$package/CHANGELOG.md" || die "packages/$package/CHANGELOG.md has no '## $VERSION'"
+  version="$(pubspec_version "$package")"
+  if [[ "$version" == "$VERSION" ]]; then
+    grep -q "^## $VERSION\$" "packages/$package/CHANGELOG.md" || die "packages/$package/CHANGELOG.md has no '## $VERSION'"
+    RELEASE+=("$package")
+  elif on_pub_dev "$package" "$version"; then
+    ok "$package stays at $version (already on pub.dev)"
+  else
+    die "$package is at $version, which is neither $VERSION nor published on pub.dev"
+  fi
 done
-grep -q "s.version *= *'$VERSION'" packages/flutter_react_embed_ios/ios/flutter_react_embed_ios.podspec \
-  || die "podspec version is not $VERSION"
-for dependency in flutter_react_embed_platform_interface flutter_react_embed_android flutter_react_embed_ios; do
-  grep -q "^  $dependency: \^$VERSION\$" packages/flutter_react_embed/pubspec.yaml \
-    || die "flutter_react_embed does not depend on $dependency ^$VERSION"
-done
-ok "all pubspecs, CHANGELOGs and the podspec are at $VERSION"
+((${#RELEASE[@]} > 0)) || die "no package's pubspec is at $VERSION"
+ok "releasing $VERSION: ${RELEASE[*]}"
 
-for package in "${PUBLISH_ORDER[@]}"; do
+grep -q "s.version *= *'$(pubspec_version flutter_react_embed_ios)'" packages/flutter_react_embed_ios/ios/flutter_react_embed_ios.podspec \
+  || die "podspec version does not match flutter_react_embed_ios $(pubspec_version flutter_react_embed_ios)"
+for dependency in flutter_react_embed_platform_interface flutter_react_embed_android flutter_react_embed_ios; do
+  constraint="^$(pubspec_version "$dependency")"
+  grep -q "^  $dependency: \\$constraint\$" packages/flutter_react_embed/pubspec.yaml \
+    || die "flutter_react_embed must depend on $dependency $constraint"
+done
+ok "podspec and flutter_react_embed's constraints match the sibling pubspecs"
+
+for package in "${RELEASE[@]}"; do
   if on_pub_dev "$package"; then
     note "$package $VERSION is already on pub.dev (will be skipped)"
   else
@@ -146,6 +185,7 @@ $forbidden
 (add them to .gitignore)"
   git status --short --untracked-files=all
   echo
+  COMMIT_MESSAGE="$(commit_message)"
   printf '%s\n' "$COMMIT_MESSAGE" | sed 's/^/    /'
   if confirm "Commit these $(git status --porcelain --untracked-files=all | wc -l | tr -d ' ') paths with the message above?"; then
     git add -A
@@ -191,20 +231,20 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-step "5. Publish to pub.dev (order: ${PUBLISH_ORDER[*]})"
+step "5. Publish to pub.dev (order: ${RELEASE[*]})"
 # -----------------------------------------------------------------------------
 published=()
-for package in "${PUBLISH_ORDER[@]}"; do
+for package in "${RELEASE[@]}"; do
   if on_pub_dev "$package"; then
     ok "$package $VERSION already on pub.dev; skipping"
     published+=("$package")
     continue
   fi
   if [[ "$package" == "flutter_react_embed" ]]; then
-    # Its ^VERSION constraints only resolve once the leaves are served.
+    # Its constraints only resolve once the leaves are served.
     for dependency in flutter_react_embed_platform_interface flutter_react_embed_android flutter_react_embed_ios; do
       if ((DRY_RUN)); then
-        on_pub_dev "$dependency" || note "dry run: would wait for $dependency $VERSION on pub.dev"
+        on_pub_dev "$dependency" || note "dry run: would wait for $dependency $(pubspec_version "$dependency") on pub.dev"
       else
         wait_for_pub_dev "$dependency"
       fi
@@ -215,7 +255,10 @@ for package in "${PUBLISH_ORDER[@]}"; do
     die "aborted before publishing $package (earlier packages stay published; re-run to continue)"
   fi
   # Interactive: pub prints the archive and validation, then asks y/N itself.
-  (cd "packages/$package" && flutter pub publish) || die "flutter pub publish failed for $package; fix and re-run"
+  publish_args=()
+  ((ASSUME_YES)) && publish_args+=(--force)
+  (cd "packages/$package" && flutter pub publish ${publish_args[@]+"${publish_args[@]}"}) \
+    || die "flutter pub publish failed for $package; fix and re-run"
   wait_for_pub_dev "$package"
   ok "$package $VERSION is live: https://pub.dev/packages/$package/versions/$VERSION"
   published+=("$package")
@@ -225,7 +268,7 @@ done
 step "6. Tags"
 # -----------------------------------------------------------------------------
 if ((DRY_RUN)); then
-  for package in "${PUBLISH_ORDER[@]}"; do note "dry run: would tag $package-v$VERSION"; done
+  for package in "${RELEASE[@]}"; do note "dry run: would tag $package-v$VERSION"; done
 else
   for package in "${published[@]}"; do
     tag="$package-v$VERSION"
@@ -248,7 +291,7 @@ step "Done"
 if ((DRY_RUN)); then
   ok "dry run finished; nothing was committed, pushed, published or tagged"
 else
-  for package in "${PUBLISH_ORDER[@]}"; do
+  for package in "${RELEASE[@]}"; do
     printf '    https://pub.dev/packages/%s/versions/%s\n' "$package" "$VERSION"
   done
 fi

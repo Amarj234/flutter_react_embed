@@ -14,6 +14,9 @@
  * keyed by runtimeId and shared (reference counted) by all surfaces of that
  * runtime: a request from Dart is answered exactly once.
  *
+ * JS can also call Dart handlers registered with
+ * ReactViewController.registerHandler: `await bridge.call('method', params)`.
+ *
  * Usage in a root component:
  *
  *   import { useFlutterBridge } from './fre-bridge-native';
@@ -51,9 +54,15 @@ function rpcError(code, message) {
   return error;
 }
 
+/** Default deadline for JS -> Dart requests, in milliseconds. */
+const CALL_TIMEOUT_MS = 10000;
+
 function createConnection(runtimeId) {
   const handlers = new Map();
   const eventListeners = new Set();
+  /** JS -> Dart requests awaiting a reply: id -> {resolve, reject, timer} */
+  const pending = new Map();
+  let nextRequestId = 1;
 
   async function answer(message) {
     const handler = handlers.get(message.method);
@@ -89,7 +98,19 @@ function createConnection(runtimeId) {
     } catch (_) {
       return;
     }
-    if (typeof message.method !== 'string') return;
+    if (typeof message.method !== 'string') {
+      // A reply to one of our own requests.
+      const request = message.id === undefined ? undefined : pending.get(message.id);
+      if (!request) return;
+      pending.delete(message.id);
+      clearTimeout(request.timer);
+      if (message.error) {
+        request.reject(rpcError(message.error.code, message.error.message || 'Dart handler failed'));
+      } else {
+        request.resolve(message.result === undefined ? null : message.result);
+      }
+      return;
+    }
     if (message.method.startsWith('$/')) return; // Host lifecycle; props arrive natively.
     if (message.id === undefined || message.id === null) {
       eventListeners.forEach((listener) => listener(message.method, message.params || {}));
@@ -105,10 +126,29 @@ function createConnection(runtimeId) {
     emit(name, params) {
       send(runtimeId, { jsonrpc: '2.0', method: name, params: params || {} });
     },
+    call(method, params, timeoutMs) {
+      return new Promise((resolve, reject) => {
+        // String ids never collide with Dart's numeric request ids.
+        const id = 'rn-' + nextRequestId++;
+        const timer = setTimeout(() => {
+          pending.delete(id);
+          reject(rpcError(-32001, 'Dart did not answer "' + method + '" within ' + (timeoutMs || CALL_TIMEOUT_MS) + ' ms'));
+        }, timeoutMs || CALL_TIMEOUT_MS);
+        pending.set(id, { resolve, reject, timer });
+        const message = { jsonrpc: '2.0', id, method };
+        if (params !== undefined) message.params = params;
+        send(runtimeId, message);
+      });
+    },
     close() {
       subscription.remove();
       handlers.clear();
       eventListeners.clear();
+      pending.forEach((request) => {
+        clearTimeout(request.timer);
+        request.reject(rpcError(-32002, 'Flutter runtime ' + runtimeId + ' disconnected'));
+      });
+      pending.clear();
     },
   };
 
@@ -120,7 +160,8 @@ function createConnection(runtimeId) {
 /**
  * Connects to the Flutter runtime described by `fre` (the `__fre` prop) and
  * serves `handlers` ({method: (params) => result}). Returns
- * `{emit(name, data), onEvent(listener) -> unsubscribe, dispose()}`, or null
+ * `{emit(name, data), call(method, params, timeoutMs), onEvent(listener) -> unsubscribe,
+ * dispose()}`, or null
  * when the component is not running inside flutter_react_embed.
  */
 export function connectFlutter(fre, handlers = {}) {
@@ -148,6 +189,10 @@ export function connectFlutter(fre, handlers = {}) {
     emit: (name, data) => {
       if (!disposed) connection.emit(name, data);
     },
+    call: (method, params, timeoutMs) =>
+      disposed
+        ? Promise.reject(rpcError(-32002, 'Bridge was disposed'))
+        : connection.call(method, params, timeoutMs),
     onEvent: (listener) => {
       connection.eventListeners.add(listener);
       listeners.add(listener);
@@ -172,8 +217,8 @@ export function connectFlutter(fre, handlers = {}) {
 
 /**
  * React hook over `connectFlutter`. `handlers` may change between renders;
- * the latest ones are always called. Returns `{emit, onEvent}`; both are
- * no-ops outside flutter_react_embed.
+ * the latest ones are always called. Returns `{emit, call, onEvent}`; outside
+ * flutter_react_embed, emit and onEvent are no-ops and call rejects.
  */
 export function useFlutterBridge(fre, handlers = {}) {
   const runtimeId = fre ? fre.runtimeId : undefined;
@@ -200,6 +245,10 @@ export function useFlutterBridge(fre, handlers = {}) {
       emit: (name, data) => {
         if (connectionRef.current) connectionRef.current.emit(name, data);
       },
+      call: (method, params, timeoutMs) =>
+        connectionRef.current
+          ? connectionRef.current.call(method, params, timeoutMs)
+          : Promise.reject(rpcError(-32002, 'Not running inside flutter_react_embed')),
       onEvent: (listener) => (connectionRef.current ? connectionRef.current.onEvent(listener) : () => {}),
     }),
     [],

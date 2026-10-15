@@ -1,6 +1,6 @@
 name: flutter_react_embed
 description: Embed React web apps and React Native apps in Flutter as native platform views on Android and iOS, with a typed JSON-RPC bridge between Dart and JavaScript.
-version: 1.1.0
+version: 1.1.1
 repository: https://github.com/Amarj234/flutter_react_embed/tree/main/packages/flutter_react_embed
 issue_tracker: https://github.com/Amarj234/flutter_react_embed/issues
 topics:
@@ -20,7 +20,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_react_embed_android: ^1.1.0
-  flutter_react_embed_ios: ^1.1.0
+  flutter_react_embed_ios: ^1.1.1
   flutter_react_embed_platform_interface: ^1.1.0
 
 dev_dependencies:

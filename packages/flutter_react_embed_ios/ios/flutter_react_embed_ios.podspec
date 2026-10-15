@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'flutter_react_embed_ios'
-  s.version          = '1.1.0'
+  s.version          = '1.1.1'
   s.summary          = 'iOS implementation of flutter_react_embed (WKWebView and React Native engines).'
   s.description      = 'Hosts production React SPAs in WKWebView and, opt-in, React Native surfaces as Flutter platform views.'
   s.homepage         = 'https://github.com/Amarj234/flutter_react_embed'

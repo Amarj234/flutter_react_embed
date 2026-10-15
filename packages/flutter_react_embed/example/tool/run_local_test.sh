@@ -42,7 +42,6 @@ WORKSPACE_DIR="$(cd "$PACKAGES_DIR/.." && pwd)"
 APP_ID="dev.flutterreactembed.flutter_react_embed_example"
 RN_MOCK_DIR="$EXAMPLE_DIR/.rn_mock"
 RN_BUNDLE="$EXAMPLE_DIR/assets/rn/index.android.bundle"
-RELEASE_VERSION="1.1.0"
 MIN_NODE_MAJOR=22
 MIN_NODE_MINOR=11
 
@@ -197,31 +196,31 @@ stage_pub_get() {
     fi
   done
 
+  # Packages are versioned independently (a patch release ships only what
+  # changed). Each must have a CHANGELOG entry for its own version, and
+  # flutter_react_embed must depend on each sibling at ^<its version>.
   local package version
   for package in flutter_react_embed flutter_react_embed_platform_interface flutter_react_embed_android flutter_react_embed_ios; do
     version="$(sed -n 's/^version: *//p' "$PACKAGES_DIR/$package/pubspec.yaml")"
-    if [[ "$version" == "$RELEASE_VERSION" ]]; then
-      ok "$package pubspec version $version"
+    if grep -q "^## $version\$" "$PACKAGES_DIR/$package/CHANGELOG.md"; then
+      ok "$package $version has a CHANGELOG entry"
     else
-      fail "$package pubspec version is '$version', expected $RELEASE_VERSION"
-    fi
-    if grep -q "^## $RELEASE_VERSION\$" "$PACKAGES_DIR/$package/CHANGELOG.md"; then
-      ok "$package CHANGELOG has a $RELEASE_VERSION entry"
-    else
-      fail "$package CHANGELOG has no '## $RELEASE_VERSION' entry"
+      fail "$package CHANGELOG has no '## $version' entry"
     fi
   done
   for package in flutter_react_embed_android flutter_react_embed_ios flutter_react_embed_platform_interface; do
-    if grep -q "^  $package: \^$RELEASE_VERSION\$" "$PLUGIN_DIR/pubspec.yaml"; then
-      ok "flutter_react_embed depends on $package ^$RELEASE_VERSION"
+    version="$(sed -n 's/^version: *//p' "$PACKAGES_DIR/$package/pubspec.yaml")"
+    if grep -q "^  $package: \^$version\$" "$PLUGIN_DIR/pubspec.yaml"; then
+      ok "flutter_react_embed depends on $package ^$version"
     else
-      fail "flutter_react_embed does not constrain $package to ^$RELEASE_VERSION"
+      fail "flutter_react_embed does not constrain $package to ^$version"
     fi
   done
-  if grep -q "s.version *= *'$RELEASE_VERSION'" "$PACKAGES_DIR/flutter_react_embed_ios/ios/flutter_react_embed_ios.podspec"; then
-    ok "podspec version $RELEASE_VERSION"
+  version="$(sed -n 's/^version: *//p' "$PACKAGES_DIR/flutter_react_embed_ios/pubspec.yaml")"
+  if grep -q "s.version *= *'$version'" "$PACKAGES_DIR/flutter_react_embed_ios/ios/flutter_react_embed_ios.podspec"; then
+    ok "podspec version $version matches flutter_react_embed_ios"
   else
-    fail "flutter_react_embed_ios.podspec version is not $RELEASE_VERSION"
+    fail "flutter_react_embed_ios.podspec version is not $version"
   fi
 
   if (cd "$WORKSPACE_DIR" && flutter analyze packages >"$LOG_DIR/analyze.log" 2>&1); then
