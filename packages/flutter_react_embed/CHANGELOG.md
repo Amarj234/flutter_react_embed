@@ -2,6 +2,13 @@
 
 All notable changes to this package are documented here. This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.0.1
+
+Documentation only. No code changes.
+
+- Rewrote the README as a step-by-step beginner guide: prerequisites, a full Vite walkthrough, a drop-in `bridge.js`, a React hook, recipes, debugging, troubleshooting and FAQ.
+- Added an author section with GitHub and LinkedIn links.
+
 ## 1.0.0
 
 Initial release.
